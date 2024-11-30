@@ -1,0 +1,11 @@
+{
+	"name": "clang_highlight",
+	"lspclient": {
+		"servers": {
+			"python": {
+				"command": ["%{Project:NativePath}/venv/bin/python", "-m", "pylsp", "--check-parent-process"]
+			}
+		}
+	}
+}
+
