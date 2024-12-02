@@ -2,10 +2,12 @@
 import clang.cindex as cl
 
 from pathlib import Path
+import dataclasses
 from dataclasses import dataclass
 import html
 import subprocess
 import urllib
+import json
 
 from sortedcontainers import SortedDict
 
@@ -65,7 +67,7 @@ class Processor:
         # Decide on CSS classes
         self.generate_classes()
 
-        self.query_lsp()
+        # self.query_lsp()
 
 
     def process_tokens(self, unit: cl.TranslationUnit):
@@ -163,7 +165,7 @@ class Processor:
                     link = Link(file=definition.location.file.name, line=definition.location.line, character=definition.location.column, qualified_name=qualified_name(definition))
 
             token.css_class = cls
-            token.link = link
+            # token.link = link
 
     def query_lsp(self):
         for offset, token in self.token_map.items():
@@ -208,7 +210,89 @@ class Processor:
                 character=location.column,
                 qualified_name=qualified_name(dest)
             )
-            # sys.exit(1)
+
+    def add_clang_ast(self, clang_args):
+        result = subprocess.run(['clang++', '-fsyntax-only', '-Xclang', '-ast-dump=json', *clang_args], capture_output=True, encoding='utf-8')
+
+        if result.returncode != 0:
+            print("clang++ did not exit cleanly", file=sys.stderr)
+
+        ast = json.loads(result.stdout)
+
+        @dataclass
+        class State:
+            file: str = None
+            line: int = -1
+            is_main_file: bool = False
+
+        state = State()
+
+        id_map = {}
+
+        def handleLoc(loc, state):
+            if 'file' in loc:
+                state.file = loc['file']
+
+                # print(f"Entering file {state.file} (vs. {self.file}")
+                state.is_main_file = (Path(state.file).absolute() == Path(self.file))
+
+            if 'line' in loc:
+                state.line = loc['line']
+
+        def visit(node, state):
+            if node.get('kind', '') == 'MemberExpr':
+                begin = node['range']['begin']['offset']
+                end = node['range']['end']['offset']
+
+                member = int(node['referencedMemberDecl'], base=0)
+                print(f"{node['kind']} at {state.file}:{node['range']['begin']['offset']} refs to 0x{member:x}")
+                ref_tuple = id_map.get(member, None)
+                if not ref_tuple:
+                    return
+
+                ref, ref_state = ref_tuple
+
+                print(f" => {ref['name']}")
+
+                if end not in self.token_map:
+                    return
+
+                self.token_map[end].link = Link(file=Path(ref_state.file).absolute(),
+                                            line=ref_state.line,
+                                            character=ref['range']['begin']['col'],
+                                            qualified_name=ref['name'])
+                # idx_end = self.token_map.bisect_right(end)
+                # for idx in range(idx_end-1, 0, -1):
+                #     token_off, token = self.token_map.items()[idx]
+                #     if token_off < begin:
+                #         break
+                #
+                #     if token.token.kind == cl.TokenKind.PUNCTUATION:
+                #         continue
+                #
+                #     if token.link is None:
+                #         token.link =
+                #
+                #     break
+
+
+        def traverse(node, state):
+            if 'loc' in node:
+                handleLoc(node['loc'], state)
+            if 'range' in node:
+                handleLoc(node['range']['begin'], state)
+
+            if state.is_main_file:
+                visit(node, state)
+
+            if 'id' in node and 'mangledName' in node:
+                id_map[int(node['id'], base=0)] = (node, dataclasses.replace(state))
+
+            for child in node.get('inner', []):
+                traverse(child, state)
+
+        print("Got AST")
+        traverse(ast, state)
 
     def dump(self):
         offset = 0
@@ -360,8 +444,29 @@ if __name__ == "__main__":
     #
     #     print(f"Annotations token: {cursor.extent.start} {cursor.displayname} {cursor.kind} {cursor.referenced}")
 
+    # for cursor in unit.cursor.walk_preorder():
+    #     if cursor.kind != cl.CursorKind.DECL_REF_EXPR:
+    #         continue
+    #
+    #     if cursor.extent.start.line != 10:
+    #         continue
+    #
+    #     print(f"{cursor.kind=} {cursor.type.spelling=} {cursor.referenced.displayname=}")
+    #
+    # def recurse(cursor):
+    #     return {
+    #         'kind': cursor.kind.name,
+    #         'children': [
+    #             recurse(c) for c in cursor.get_children()
+    #         ]
+    #     }
+    #
+    # data = recurse(unit.cursor)
+    # print(json.dumps(data, indent=2))
+
     proc = Processor(sys.argv[1], input_file)
     proc.process(unit.cursor)
+    proc.add_clang_ast(command[2:])
     # proc.process_tokens(unit)
     # proc.dump()
 
