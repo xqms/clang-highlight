@@ -345,29 +345,43 @@ void dumpHTML(std::istream &in, std::ostream &out, const TokenMap &tokens) {
   out << "</pre></body></html>\n";
 }
 
-void dumpJSON(std::ostream &out, const TokenMap &tokens) {
-  llvm::raw_os_ostream osOStream{out};
-  llvm::json::OStream stream{osOStream, 2};
+enum class PunctuationMode { Keep, Skip };
 
-  stream.array([&]() {
-    for (const auto &[offset, token] : tokens) {
-      stream.object([&]() {
-        stream.attribute("offset", offset);
-        stream.attribute("length", token.token.getLength());
-        stream.attribute("type", ResultToken::typeName(token.type));
+void dumpJSON(std::ostream &out, const std::string &file,
+              const TokenMap &tokens,
+              PunctuationMode punct = PunctuationMode::Keep) {
+  {
+    llvm::raw_os_ostream osOStream{out};
+    llvm::json::OStream stream{osOStream, 2};
 
-        if (token.link) {
-          stream.attributeObject("link", [&]() {
-            stream.attribute("file", token.link->file);
-            stream.attribute("line", token.link->line);
-            stream.attribute("column", token.link->column);
-            stream.attribute("name", token.link->name);
-            stream.attribute("qualified_name", token.link->qualifiedName);
+    stream.object([&]() {
+      stream.attribute("file", file);
+      stream.attributeArray("tokens", [&]() {
+        for (const auto &[offset, token] : tokens) {
+          if (punct == PunctuationMode::Skip &&
+              token.type == ResultToken::Type::Punctuation)
+            continue;
+
+          stream.object([&]() {
+            stream.attribute("offset", offset);
+            stream.attribute("length", token.token.getLength());
+            stream.attribute("type", ResultToken::typeName(token.type));
+
+            if (token.link) {
+              stream.attributeObject("link", [&]() {
+                stream.attribute("file", token.link->file);
+                stream.attribute("line", token.link->line);
+                stream.attribute("column", token.link->column);
+                stream.attribute("name", token.link->name);
+                stream.attribute("qualified_name", token.link->qualifiedName);
+              });
+            }
           });
         }
       });
-    }
-  });
+    });
+  }
+  out << "\n";
 }
 
 // Apply a custom category to all command-line options so that they are the
@@ -379,17 +393,30 @@ static llvm::cl::OptionCategory MyCategory("clang_highlight options");
 // It's nice to have this help message in all tools.
 static cl::extrahelp CommonHelp(CommonOptionsParser::HelpMessage);
 
-static cl::opt<std::string> OptHTMLOut{
-    "html-out", cl::desc{"Write HTML output to"}, cl::value_desc{"out.html"},
-    cl::cat{MyCategory}};
-static cl::opt<std::string> OptJSONOut{
-    "json-out", cl::desc{"Write JSON output to"}, cl::value_desc{"out.json"},
+static cl::list<std::string> OptHTMLOut{"html-out",
+                                        cl::desc{"Write HTML output to"},
+                                        cl::value_desc{"out.html"},
+                                        cl::cat{MyCategory},
+                                        cl::Optional,
+                                        cl::ValueOptional};
+static cl::list<std::string> OptJSONOut{"json-out",
+                                        cl::desc{"Write JSON output to"},
+                                        cl::value_desc{"out.json"},
+                                        cl::cat{MyCategory},
+                                        cl::Optional,
+                                        cl::ValueOptional};
+static cl::opt<bool> OptNoPunctuation{
+    "no-punctuation", cl::desc{"Do not output punctuation tokens"},
     cl::cat{MyCategory}};
 
 // // A help message for this specific tool can be added afterwards.
 // static cl::extrahelp MoreHelp("\nMore help text...\n");
 
 int main(int argc, const char **argv) {
+  cl::SetVersionPrinter([&](llvm::raw_ostream& stream){
+    stream << "clang-highlight version " << CH_VERSION_MAJOR << "." << CH_VERSION_MINOR << "." << CH_VERSION_PATCH << "\n";
+  });
+
   auto ExpectedParser = CommonOptionsParser::create(
       argc, argv, MyCategory, cl::NumOccurrencesFlag::Required);
   if (!ExpectedParser) {
@@ -436,8 +463,9 @@ int main(int argc, const char **argv) {
     if (tok.is(tok::eof))
       break;
 
-    tokens[sourceManager.getFileOffset(tok.getLocation())] =
-        ResultToken{tok, ast->getPreprocessor()};
+    ResultToken res{tok, ast->getPreprocessor()};
+
+    tokens[sourceManager.getFileOffset(tok.getLocation())] = res;
   } while (lexer.getBufferLocation() < buffer.end());
 
   // Handle preprocessor statements
@@ -513,16 +541,30 @@ int main(int argc, const char **argv) {
 
   // Dump HTML
   if (!OptHTMLOut.empty()) {
-    std::ofstream out{OptHTMLOut};
     std::ifstream in{ast->getMainFileName().data()};
 
-    dumpHTML(in, out, tokens);
+    if (OptHTMLOut.front().empty())
+      dumpHTML(in, std::cout, tokens);
+    else {
+      std::ofstream out{OptHTMLOut.front()};
+      dumpHTML(in, out, tokens);
+    }
   }
 
   // Dump JSON
   if (!OptJSONOut.empty()) {
-    std::ofstream out{OptJSONOut};
-    dumpJSON(out, tokens);
+    std::ofstream out{OptJSONOut.front()};
+    auto file = ast->getMainFileName().str();
+
+    PunctuationMode punct =
+        OptNoPunctuation ? PunctuationMode::Skip : PunctuationMode::Keep;
+
+    if (OptJSONOut.front().empty())
+      dumpJSON(std::cout, file, tokens, punct);
+    else {
+      std::ofstream out{OptJSONOut.front()};
+      dumpJSON(out, file, tokens, punct);
+    }
   }
 
   return 0;

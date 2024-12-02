@@ -2,6 +2,10 @@
 cmake_minimum_required(VERSION 3.20)
 project(clang_highlight)
 
+set(VERSION_MAJOR 0)
+set(VERSION_MINOR 1)
+set(VERSION_PATCH 0)
+
 set(CMAKE_CXX_STANDARD 23)
 
 find_package(LLVM REQUIRED)
@@ -49,10 +53,18 @@ find_llvm_lib(ProfileData)
 find_llvm_lib(FrontendOpenMP)
 find_llvm_lib(WindowsDriver)
 
-add_executable(clang_highlight
+add_executable(clang-highlight
     clang_highlight.cpp
 )
-target_link_libraries(clang_highlight PRIVATE
+target_compile_definitions(clang-highlight PRIVATE
+    CH_VERSION_MAJOR=${VERSION_MAJOR}
+    CH_VERSION_MINOR=${VERSION_MINOR}
+    CH_VERSION_PATCH=${VERSION_PATCH}
+)
+target_compile_options(clang-highlight PRIVATE
+    "-Wall"
+)
+target_link_libraries(clang-highlight PRIVATE
     clang::Frontend
     clang::Parse
     clang::Sema
