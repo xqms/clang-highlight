@@ -54,7 +54,7 @@ find_llvm_lib(FrontendOpenMP)
 find_llvm_lib(WindowsDriver)
 
 add_executable(clang-highlight
-    clang_highlight.cpp
+    src/clang_highlight.cpp
 )
 target_compile_definitions(clang-highlight PRIVATE
     CH_VERSION_MAJOR=${VERSION_MAJOR}
