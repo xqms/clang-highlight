@@ -1,4 +1,6 @@
 
+#include <clang/AST/NestedNameSpecifier.h>
+#include <clang/AST/TypeLoc.h>
 #include <clang/ASTMatchers/ASTMatchFinder.h>
 #include <clang/ASTMatchers/ASTMatchers.h>
 #include <clang/Basic/SourceLocation.h>
@@ -158,7 +160,10 @@ public:
   }
 };
 
-// Match finders
+////////////////////////////////////////////////////////////////////////////////
+// Semantic AST matchers
+
+// Find references to declarations in expressions and link them
 StatementMatcher DeclRefMatcher =
     declRefExpr(isExpansionInMainFile()).bind("declRefExpr");
 
@@ -210,6 +215,7 @@ private:
   TokenMap &tokens;
 };
 
+// Find variable declarations and mark the tokens as variable names
 DeclarationMatcher VarDeclMatcher =
     traverse(TK_IgnoreUnlessSpelledInSource,
              varDecl(isExpansionInMainFile()).bind("varDecl"));
@@ -242,6 +248,73 @@ private:
   TokenMap &tokens;
 };
 
+// Find types and link them to their declarations
+auto TypeMatcher =
+    traverse(TK_IgnoreUnlessSpelledInSource, elaboratedTypeLoc().bind("loc"));
+
+class TypeHandler : public MatchFinder::MatchCallback {
+public:
+  explicit TypeHandler(TokenMap &tokens) : tokens{tokens} {}
+
+  virtual void run(const MatchFinder::MatchResult &Result) {
+    if (const auto *N =
+            Result.Nodes.getNodeAs<clang::ElaboratedTypeLoc>("loc")) {
+      visitTypeLoc(Result.Context->getSourceManager(), *N);
+    }
+  }
+
+private:
+  void createLink(const SourceManager &sourceManager, SourceLocation fromLoc,
+                  NamedDecl *decl) {
+    if (!sourceManager.isInMainFile(fromLoc))
+      return;
+
+    std::size_t fromOffset = sourceManager.getFileOffset(fromLoc);
+
+    auto it = tokens.lowerBound(fromOffset);
+    if (it == tokens.end())
+      return;
+
+    if (it->first != fromOffset)
+      return;
+
+    SourceLocation toLoc = decl->getLocation();
+    if (sourceManager.isInMainFile(toLoc))
+      return;
+
+    it->second.link =
+        Link{.name = decl->getNameAsString(),
+             .qualifiedName = decl->getQualifiedNameAsString(),
+             .file = sourceManager.getFilename(toLoc),
+             .line = sourceManager.getSpellingLineNumber(toLoc),
+             .column = sourceManager.getSpellingColumnNumber(toLoc)};
+  }
+
+  void visitTypeLoc(const SourceManager &sourceManager,
+                    const ElaboratedTypeLoc &loc) {
+    if (loc.isNull())
+      return;
+
+    auto inner = loc.getNextTypeLoc();
+    if (inner.isNull())
+      return;
+
+    if (auto tloc = inner.getAs<TemplateSpecializationTypeLoc>()) {
+      if (auto decl = tloc.getTypePtr()->getAsCXXRecordDecl())
+        createLink(sourceManager, tloc.getTemplateNameLoc(), decl);
+    } else if (auto tloc = inner.getAs<TypedefTypeLoc>()) {
+      createLink(sourceManager, tloc.getBeginLoc(),
+                 tloc.getTypePtr()->getDecl());
+    } else if (auto rloc = inner.getAs<RecordTypeLoc>()) {
+      createLink(sourceManager, rloc.getBeginLoc(),
+                 rloc.getTypePtr()->getDecl());
+    }
+  }
+
+  TokenMap &tokens;
+};
+
+// Find references to members and link them
 StatementMatcher MemberExprMatcher =
     memberExpr(isExpansionInMainFile()).bind("memberExpr");
 
@@ -413,8 +486,9 @@ static cl::opt<bool> OptNoPunctuation{
 // static cl::extrahelp MoreHelp("\nMore help text...\n");
 
 int main(int argc, const char **argv) {
-  cl::SetVersionPrinter([&](llvm::raw_ostream& stream){
-    stream << "clang-highlight version " << CH_VERSION_MAJOR << "." << CH_VERSION_MINOR << "." << CH_VERSION_PATCH << "\n";
+  cl::SetVersionPrinter([&](llvm::raw_ostream &stream) {
+    stream << "clang-highlight version " << CH_VERSION_MAJOR << "."
+           << CH_VERSION_MINOR << "." << CH_VERSION_PATCH << "\n";
   });
 
   auto ExpectedParser = CommonOptionsParser::create(
@@ -532,10 +606,12 @@ int main(int argc, const char **argv) {
   // Semantic AST pass
   DeclRefExprHandler declRefHandler{tokens};
   VarDeclHandler varDeclHandler{tokens};
+  TypeHandler typeHandler{tokens};
   MemberExprHandler memberHandler{tokens};
   MatchFinder Finder;
   Finder.addMatcher(DeclRefMatcher, &declRefHandler);
   Finder.addMatcher(VarDeclMatcher, &varDeclHandler);
+  Finder.addMatcher(::TypeMatcher, &typeHandler);
   Finder.addMatcher(MemberExprMatcher, &memberHandler);
   Finder.matchAST(ast->getASTContext());
 
