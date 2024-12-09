@@ -277,10 +277,16 @@ public:
       if (!loc.isValid() || !sourceManager.isWrittenInMainFile(loc))
         return;
 
+      // if(auto info = VD->getTypeSourceInfo())
+      //   info->getTypeLoc().dump();
+
       auto offset = sourceManager.getFileOffset(loc);
 
       auto it = tokens.lowerBound(offset);
       if (it == tokens.end() || it->first != offset) {
+        std::cerr << "Looking for offset " << offset << "\n";
+        loc.dump(sourceManager);
+        VD->dump();
         throw std::runtime_error{"Could not find VarDecl token"};
       }
 
