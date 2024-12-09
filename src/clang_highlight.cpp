@@ -178,7 +178,7 @@ public:
       auto &sourceManager = Result.Context->getSourceManager();
       auto loc = sourceManager.getSpellingLoc(DRE->getLocation());
 
-      if (!loc.isValid() || !sourceManager.isInMainFile(loc))
+      if (!loc.isValid() || !sourceManager.isWrittenInMainFile(loc))
         return;
 
       auto offset = sourceManager.getFileOffset(loc);
@@ -199,7 +199,7 @@ public:
       }
 
       auto declLoc = decl->getLocation();
-      if (sourceManager.isInMainFile(declLoc))
+      if (sourceManager.isWrittenInMainFile(declLoc))
         return;
 
       it->second.link =
@@ -230,7 +230,7 @@ public:
       auto &sourceManager = Result.Context->getSourceManager();
       auto loc = sourceManager.getSpellingLoc(VD->getLocation());
 
-      if (!loc.isValid() || !sourceManager.isInMainFile(loc))
+      if (!loc.isValid() || !sourceManager.isWrittenInMainFile(loc))
         return;
 
       auto offset = sourceManager.getFileOffset(loc);
@@ -266,7 +266,10 @@ public:
 private:
   void createLink(const SourceManager &sourceManager, SourceLocation fromLoc,
                   NamedDecl *decl) {
-    if (!sourceManager.isInMainFile(fromLoc))
+    if(!decl)
+      return;
+
+    if (!sourceManager.isWrittenInMainFile(fromLoc))
       return;
 
     std::size_t fromOffset = sourceManager.getFileOffset(fromLoc);
@@ -279,7 +282,7 @@ private:
       return;
 
     SourceLocation toLoc = decl->getLocation();
-    if (sourceManager.isInMainFile(toLoc))
+    if (sourceManager.isWrittenInMainFile(toLoc))
       return;
 
     it->second.link =
@@ -329,7 +332,7 @@ public:
       auto &sourceManager = Result.Context->getSourceManager();
       auto loc = sourceManager.getSpellingLoc(ME->getMemberLoc());
 
-      if (!loc.isValid() || !sourceManager.isInMainFile(loc))
+      if (!loc.isValid() || !sourceManager.isWrittenInMainFile(loc))
         return;
       auto offset = sourceManager.getFileOffset(loc);
 
@@ -342,7 +345,7 @@ public:
         return;
 
       auto declLoc = decl->getLocation();
-      if (sourceManager.isInMainFile(declLoc))
+      if (sourceManager.isWrittenInMainFile(declLoc))
         return;
 
       it->second.link =
@@ -551,7 +554,7 @@ int main(int argc, const char **argv) {
     for (auto it = prepBegin; it != prepEnd; ++it) {
       auto preproc = *it;
       auto beginLoc = preproc->getSourceRange().getBegin();
-      if (!sourceManager.isInMainFile(beginLoc) ||
+      if (!sourceManager.isWrittenInMainFile(beginLoc) ||
           ast->isInPreambleFileID(beginLoc) ||
           !rec.isEntityInFileID(it, sourceManager.getMainFileID()))
         continue;
