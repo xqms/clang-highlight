@@ -434,11 +434,35 @@ void dumpHTML(std::istream &in, std::ostream &out, const TokenMap &tokens) {
   std::vector<char> copyBuf;
 
   auto transfer = [&](std::size_t n) {
-    if (copyBuf.size() < n)
-      copyBuf.resize(n);
+    copyBuf.resize(n);
 
     in.read(copyBuf.data(), n);
-    out.write(copyBuf.data(), n);
+
+    for (char c : copyBuf) {
+      switch (c) {
+      case '&':
+        out << "&amp;";
+        break;
+      case '<':
+        out << "&lt;";
+        break;
+      case '>':
+        out << "&gt;";
+        break;
+      case '"':
+        out << "&quot;";
+        break;
+      case '\'':
+        out << "&#39;";
+        break;
+      case '/':
+        out << "&#47;";
+        break;
+      default:
+        out << c;
+        break;
+      }
+    }
 
     textOffset += n;
   };
