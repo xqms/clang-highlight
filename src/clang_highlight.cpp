@@ -661,12 +661,17 @@ int main(int argc, const char **argv) {
         if (MacroExpansion *expansion = dyn_cast<MacroExpansion>(preproc)) {
           if (auto def = expansion->getDefinition()) {
             auto loc = def->getLocation();
-            tokenIt->second.link =
-                Link{.name = def->getName()->getName().str(),
-                     .qualifiedName = def->getName()->getName().str(),
-                     .file = sourceManager.getFilename(loc),
-                     .line = sourceManager.getSpellingLineNumber(loc),
-                     .column = sourceManager.getSpellingColumnNumber(loc)};
+            auto file = sourceManager.getFilename(loc);
+
+            if(!sourceManager.isWrittenInMainFile(loc) && !file.empty())
+            {
+              tokenIt->second.link =
+                  Link{.name = def->getName()->getName().str(),
+                      .qualifiedName = def->getName()->getName().str(),
+                      .file = file,
+                      .line = sourceManager.getSpellingLineNumber(loc),
+                      .column = sourceManager.getSpellingColumnNumber(loc)};
+            }
           }
         }
 
