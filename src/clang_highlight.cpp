@@ -163,6 +163,47 @@ public:
         begin(), end(), offset,
         [](const auto &pair, std::size_t o) { return pair.first < o; });
   }
+
+  ResultToken *getOrSplitToken(std::size_t offset) {
+    auto it = lowerBound(offset);
+    if (it == end())
+      return {};
+
+    if (it->first > offset) {
+      // Are we inside the token before?
+      --it;
+      if (it == begin())
+        return {}; // Nothing there
+
+      std::size_t origLength = it->second.token.getLength();
+      bool inside = it->first <= offset && it->first + origLength > offset;
+      if (!inside)
+        return {}; // Nothing there
+
+      // Split token
+      std::size_t firstOffset = it->first;
+      ResultToken firstPart = it->second;
+
+      std::size_t secondOffset = offset;
+      ResultToken secondPart = it->second;
+
+      firstPart.token.setLength(secondOffset - firstOffset);
+
+      secondPart.token.setLocation(
+          firstPart.token.getLocation().getLocWithOffset(
+              firstPart.token.getLength()));
+      secondPart.token.setLength(firstOffset + origLength - secondOffset);
+
+      erase(it);
+      emplace(firstOffset, std::move(firstPart));
+      auto [itNew, _] = emplace(secondOffset, std::move(secondPart));
+
+      return &itNew->second;
+    } else if (it->first == offset) {
+      return &it->second;
+    } else
+      throw std::logic_error{"getOrSplitToken logic error"};
+  }
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -186,33 +227,31 @@ public:
       if (!loc.isValid() || !sourceManager.isWrittenInMainFile(loc))
         return;
 
-      auto offset = sourceManager.getFileOffset(loc);
-
-      auto it = tokens.lowerBound(offset);
-      if (it == tokens.end() || it->first != offset) {
-        std::cerr << "Looking for offset " << offset << "\n";
-        loc.dump(sourceManager);
-        throw std::runtime_error{"Could not find DeclRefExpr token"};
-      }
-
-      auto decl = DRE->getDecl();
+      auto decl = DRE->getFoundDecl();
       if (!decl)
         return;
-
-      if (dyn_cast<VarDecl>(decl)) {
-        it->second.type = ResultToken::Type::Variable;
-      }
 
       auto declLoc = decl->getLocation();
       if (sourceManager.isWrittenInMainFile(declLoc))
         return;
 
-      it->second.link =
-          Link{.name = decl->getNameAsString(),
-               .qualifiedName = decl->getQualifiedNameAsString(),
-               .file = sourceManager.getFilename(declLoc),
-               .line = sourceManager.getSpellingLineNumber(declLoc),
-               .column = sourceManager.getSpellingColumnNumber(declLoc)};
+      auto offset = sourceManager.getFileOffset(loc);
+      if (ResultToken *res = tokens.getOrSplitToken(offset)) {
+        if (dyn_cast<VarDecl>(decl))
+          res->type = ResultToken::Type::Variable;
+
+        res->link =
+            Link{.name = decl->getNameAsString(),
+                 .qualifiedName = decl->getQualifiedNameAsString(),
+                 .file = sourceManager.getFilename(declLoc),
+                 .line = sourceManager.getSpellingLineNumber(declLoc),
+                 .column = sourceManager.getSpellingColumnNumber(declLoc)};
+      } else {
+        std::cerr << "Looking for offset " << offset << "\n";
+        DRE->dump();
+        loc.dump(sourceManager);
+        throw std::runtime_error{"Could not find DeclRefExpr token"};
+      }
     }
   }
 
