@@ -1,4 +1,8 @@
+// clang-highlight produces semantic highlighting information
+// Author: Max Schwarz <max.schwarz@online.de>
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wnonnull"
 #include <clang/AST/NestedNameSpecifier.h>
 #include <clang/AST/TypeLoc.h>
 #include <clang/ASTMatchers/ASTMatchFinder.h>
@@ -13,6 +17,7 @@
 #include <llvm/Support/CommandLine.h>
 #include <llvm/Support/JSON.h>
 #include <llvm/Support/raw_os_ostream.h>
+#pragma GCC diagnostic pop
 
 #include <fstream>
 #include <iostream>
