@@ -86,3 +86,9 @@ target_link_libraries(clang-highlight PRIVATE
     llvm::FrontendOpenMP
     llvm::WindowsDriver
 )
+
+# Tests
+if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
+    include(CTest)
+    add_subdirectory(tests)
+endif()
