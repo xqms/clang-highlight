@@ -352,6 +352,9 @@ private:
     } else if (auto tloc = inner.getAs<TypedefTypeLoc>()) {
       createLink(sourceManager, tloc.getBeginLoc(),
                  tloc.getTypePtr()->getDecl());
+    } else if (auto tloc = inner.getAs<UsingTypeLoc>()) {
+      createLink(sourceManager, tloc.getBeginLoc(),
+                 tloc.getTypePtr()->getFoundDecl());
     } else if (auto rloc = inner.getAs<RecordTypeLoc>()) {
       createLink(sourceManager, rloc.getBeginLoc(),
                  rloc.getTypePtr()->getDecl());
