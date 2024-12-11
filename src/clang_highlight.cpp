@@ -319,7 +319,7 @@ public:
 private:
   void createLink(const SourceManager &sourceManager, SourceLocation fromLoc,
                   NamedDecl *decl) {
-    if(!decl)
+    if (!decl)
       return;
 
     if (!sourceManager.isWrittenInMainFile(fromLoc))
@@ -690,14 +690,13 @@ int main(int argc, const char **argv) {
             auto loc = def->getLocation();
             auto file = sourceManager.getFilename(loc);
 
-            if(!sourceManager.isWrittenInMainFile(loc) && !file.empty())
-            {
+            if (!sourceManager.isWrittenInMainFile(loc) && !file.empty()) {
               tokenIt->second.link =
                   Link{.name = def->getName()->getName().str(),
-                      .qualifiedName = def->getName()->getName().str(),
-                      .file = file,
-                      .line = sourceManager.getSpellingLineNumber(loc),
-                      .column = sourceManager.getSpellingColumnNumber(loc)};
+                       .qualifiedName = def->getName()->getName().str(),
+                       .file = file,
+                       .line = sourceManager.getSpellingLineNumber(loc),
+                       .column = sourceManager.getSpellingColumnNumber(loc)};
             }
           }
         }
