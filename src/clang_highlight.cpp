@@ -498,7 +498,7 @@ void dumpHTML(std::istream &in, std::ostream &out, const TokenMap &tokens) {
   out << "</pre></body></html>\n";
 }
 
-enum class PunctuationMode { Keep, Skip };
+enum class PunctuationMode { Keep, KeepLinked, Skip };
 
 void dumpJSON(std::ostream &out, const std::string &file,
               const TokenMap &tokens,
@@ -511,9 +511,12 @@ void dumpJSON(std::ostream &out, const std::string &file,
       stream.attribute("file", file);
       stream.attributeArray("tokens", [&]() {
         for (const auto &[offset, token] : tokens) {
-          if (punct == PunctuationMode::Skip &&
-              token.type == ResultToken::Type::Punctuation)
-            continue;
+          if (token.type == ResultToken::Type::Punctuation) {
+            if (punct == PunctuationMode::KeepLinked && !token.link)
+              continue;
+            if (punct == PunctuationMode::Skip)
+              continue;
+          }
 
           stream.object([&]() {
             stream.attribute("offset", offset);
@@ -558,9 +561,17 @@ static cl::list<std::string> OptJSONOut{"json-out",
                                         cl::cat{MyCategory},
                                         cl::Optional,
                                         cl::ValueOptional};
-static cl::opt<bool> OptNoPunctuation{
-    "no-punctuation", cl::desc{"Do not output punctuation tokens"},
-    cl::cat{MyCategory}};
+
+static cl::opt<PunctuationMode> OptPunctMode{
+    "punctuation", cl::desc{"Choose which punctuation tokens to keep"},
+    cl::values(
+        clEnumValN(PunctuationMode::Keep, "keep",
+                   "Keep all punctuation (default)"),
+        clEnumValN(
+            PunctuationMode::KeepLinked, "linked",
+            "Keep only punctuation tokens with links (e.g. custom operators)"),
+        clEnumValN(PunctuationMode::Skip, "skip", "Skip all punctuation")),
+    cl::init(PunctuationMode::Keep), cl::cat(MyCategory)};
 
 // // A help message for this specific tool can be added afterwards.
 // static cl::extrahelp MoreHelp("\nMore help text...\n");
@@ -717,14 +728,11 @@ int main(int argc, const char **argv) {
     std::ofstream out{OptJSONOut.front()};
     auto file = ast->getMainFileName().str();
 
-    PunctuationMode punct =
-        OptNoPunctuation ? PunctuationMode::Skip : PunctuationMode::Keep;
-
     if (OptJSONOut.front().empty())
-      dumpJSON(std::cout, file, tokens, punct);
+      dumpJSON(std::cout, file, tokens, OptPunctMode);
     else {
       std::ofstream out{OptJSONOut.front()};
-      dumpJSON(out, file, tokens, punct);
+      dumpJSON(out, file, tokens, OptPunctMode);
     }
   }
 
