@@ -146,6 +146,9 @@ struct ResultToken {
     determineType(pp);
   }
 
+  explicit ResultToken(const Token &token, Type type)
+      : token{token}, type{type} {}
+
   Token token;
   Type type = Type::Other;
   std::optional<Link> link;
@@ -663,12 +666,19 @@ int main(int argc, const char **argv) {
         // Mark entire range as preprocessor
         auto endOffset =
             sourceManager.getFileOffset(preproc->getSourceRange().getEnd());
-        for (; tokenIt != tokens.end(); tokenIt++) {
+
+        clang::Token lexerToken = tokenIt->second.token;
+        lexerToken.setLength(endOffset - beginOffset);
+
+        while (tokenIt != tokens.end()) {
           if (tokenIt->first > endOffset)
             break;
 
-          tokenIt->second.type = ResultToken::Type::Preprocessor;
+          tokenIt = tokens.erase(tokenIt);
         }
+
+        tokens[beginOffset] =
+            ResultToken{lexerToken, ResultToken::Type::Preprocessor};
         break;
       }
       case PreprocessedEntity::EntityKind::MacroExpansionKind:
