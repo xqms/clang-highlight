@@ -30,6 +30,7 @@ using namespace llvm;
 struct Link {
   std::string name;
   std::string qualifiedName;
+  std::vector<std::string> parameterTypes;
   StringRef file;
   unsigned int line;
   unsigned int column;
@@ -249,6 +250,11 @@ public:
                  .file = sourceManager.getFilename(declLoc),
                  .line = sourceManager.getSpellingLineNumber(declLoc),
                  .column = sourceManager.getSpellingColumnNumber(declLoc)};
+
+        if (auto func = dyn_cast<FunctionDecl>(decl)) {
+          for (auto &param : func->parameters())
+            res->link->parameterTypes.push_back(param->getType().getAsString());
+        }
       } else {
         std::cerr << "Looking for offset " << offset << "\n";
         DRE->dump();
@@ -410,6 +416,15 @@ public:
                .file = sourceManager.getFilename(declLoc),
                .line = sourceManager.getSpellingLineNumber(declLoc),
                .column = sourceManager.getSpellingColumnNumber(declLoc)};
+
+      if (auto func = dyn_cast<FunctionDecl>(decl)) {
+        for (auto &param : func->parameters())
+          it->second.link->parameterTypes.push_back(param->getType().getAsString());
+      }
+      if (auto func = dyn_cast<FunctionTemplateDecl>(decl)) {
+        for (auto &param : func->getTemplatedDecl()->parameters())
+          it->second.link->parameterTypes.push_back(param->getType().getAsString());
+      }
     }
   }
 
@@ -533,6 +548,13 @@ void dumpJSON(std::ostream &out, const std::string &file,
                 stream.attribute("column", token.link->column);
                 stream.attribute("name", token.link->name);
                 stream.attribute("qualified_name", token.link->qualifiedName);
+
+                if (!token.link->parameterTypes.empty()) {
+                  stream.attributeArray("parameter_types", [&]() {
+                    for (auto &param : token.link->parameterTypes)
+                      stream.value(param);
+                  });
+                }
               });
             }
           });
