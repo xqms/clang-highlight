@@ -235,6 +235,12 @@ public:
       if (!decl)
         return;
 
+      if (auto func = dyn_cast<FunctionDecl>(decl)) {
+        // Find underlying template
+        if (auto info = func->getTemplateSpecializationInfo())
+          decl = info->getTemplate()->getTemplatedDecl();
+      }
+
       auto declLoc = decl->getLocation();
       if (sourceManager.isWrittenInMainFile(declLoc))
         return;
@@ -402,13 +408,51 @@ public:
       if (it == tokens.end() || it->first != offset)
         throw std::runtime_error{"Could not find MemberExpr token"};
 
-      auto decl = ME->getMemberDecl();
+      NamedDecl *decl = ME->getMemberDecl();
       if (!decl)
         return;
 
       auto declLoc = decl->getLocation();
       if (sourceManager.isWrittenInMainFile(declLoc))
         return;
+
+      // TODO: Fix this mess!
+      if (auto method = dyn_cast<CXXMethodDecl>(decl))
+        if (auto instFrom = method->getInstantiatedFromDecl())
+          decl = instFrom;
+      if (auto method = dyn_cast<CXXMethodDecl>(decl))
+        if (auto instFrom = method->getInstantiatedFromMemberFunction())
+          decl = instFrom;
+      if (auto method = dyn_cast<CXXMethodDecl>(decl))
+        if (auto instFrom = method->getInstantiatedFromDecl())
+          decl = instFrom;
+      if (auto method = dyn_cast<CXXMethodDecl>(decl))
+        if (auto instFrom = method->getInstantiatedFromMemberFunction())
+          decl = instFrom;
+      if (auto method = dyn_cast<FunctionTemplateDecl>(decl))
+        if (auto instFrom = method->getInstantiatedFromMemberTemplate())
+          decl = instFrom;
+      if (auto method = dyn_cast<CXXMethodDecl>(decl))
+        if (auto instFrom = method->getInstantiatedFromDecl())
+          decl = instFrom;
+      if (auto method = dyn_cast<CXXMethodDecl>(decl))
+        if (auto instFrom = method->getInstantiatedFromMemberFunction())
+          decl = instFrom;
+      if (auto method = dyn_cast<CXXMethodDecl>(decl)) {
+        if (auto info = method->getTemplateSpecializationInfo()) {
+          if (auto memberInfo = info->getMemberSpecializationInfo())
+            decl = memberInfo->getInstantiatedFrom();
+          else
+            decl = info->getTemplate();
+        }
+      }
+      if (auto method = dyn_cast<FunctionTemplateDecl>(decl))
+        if (auto instFrom = method->getInstantiatedFromMemberTemplate())
+          decl = instFrom;
+
+      // std::string dump;
+      // llvm::raw_string_ostream dumpStream{dump};
+      // decl->dump(dumpStream);
 
       it->second.link =
           Link{.name = decl->getNameAsString(),
