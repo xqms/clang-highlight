@@ -704,8 +704,10 @@ int main(int argc, const char **argv) {
       switch (preproc->getKind()) {
       case PreprocessedEntity::EntityKind::InclusionDirectiveKind: {
         // Mark entire range as preprocessor
-        auto endOffset =
-            sourceManager.getFileOffset(preproc->getSourceRange().getEnd());
+        auto end = clang::Lexer::getLocForEndOfToken(
+            preproc->getSourceRange().getEnd(), 0, sourceManager,
+            ast->getLangOpts());
+        auto endOffset = sourceManager.getFileOffset(end);
 
         clang::Token lexerToken = tokenIt->second.token;
         lexerToken.setLength(endOffset - beginOffset);
