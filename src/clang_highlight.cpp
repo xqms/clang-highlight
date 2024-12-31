@@ -376,8 +376,6 @@ private:
       return;
 
     SourceLocation toLoc = decl->getLocation();
-    if (sourceManager.isWrittenInMainFile(toLoc))
-      return;
 
     it->second.link =
         Link{.name = decl->getNameAsString(),
