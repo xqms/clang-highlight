@@ -140,6 +140,24 @@ struct ResultToken {
     }();
   }
 
+  void addLink(const NamedDecl *decl, SourceManager &sourceManager) {
+    auto declLoc = decl->getLocation();
+
+    link = Link{.name = decl->getNameAsString(),
+                .qualifiedName = decl->getQualifiedNameAsString(),
+                .file = sourceManager.getFilename(declLoc),
+                .line = sourceManager.getSpellingLineNumber(declLoc),
+                .column = sourceManager.getSpellingColumnNumber(declLoc)};
+
+    // llvm::raw_string_ostream dumpStream{link->dump};
+    // decl->dump(dumpStream);
+
+    if (auto func = dyn_cast<FunctionDecl>(decl)) {
+      for (auto &param : func->parameters())
+        link->parameterTypes.push_back(param->getType().getAsString());
+    }
+  }
+
   ResultToken() = default;
 
   explicit ResultToken(const Token &token, const clang::Preprocessor &pp)
@@ -250,17 +268,7 @@ public:
         if (dyn_cast<VarDecl>(decl))
           res->type = ResultToken::Type::Variable;
 
-        res->link =
-            Link{.name = decl->getNameAsString(),
-                 .qualifiedName = decl->getQualifiedNameAsString(),
-                 .file = sourceManager.getFilename(declLoc),
-                 .line = sourceManager.getSpellingLineNumber(declLoc),
-                 .column = sourceManager.getSpellingColumnNumber(declLoc)};
-
-        if (auto func = dyn_cast<FunctionDecl>(decl)) {
-          for (auto &param : func->parameters())
-            res->link->parameterTypes.push_back(param->getType().getAsString());
-        }
+        res->addLink(decl, sourceManager);
       } else {
         std::cerr << "Looking for offset " << offset << "\n";
         DRE->dump();
@@ -454,21 +462,7 @@ public:
       // llvm::raw_string_ostream dumpStream{dump};
       // decl->dump(dumpStream);
 
-      it->second.link =
-          Link{.name = decl->getNameAsString(),
-               .qualifiedName = decl->getQualifiedNameAsString(),
-               .file = sourceManager.getFilename(declLoc),
-               .line = sourceManager.getSpellingLineNumber(declLoc),
-               .column = sourceManager.getSpellingColumnNumber(declLoc)};
-
-      if (auto func = dyn_cast<FunctionDecl>(decl)) {
-        for (auto &param : func->parameters())
-          it->second.link->parameterTypes.push_back(param->getType().getAsString());
-      }
-      if (auto func = dyn_cast<FunctionTemplateDecl>(decl)) {
-        for (auto &param : func->getTemplatedDecl()->parameters())
-          it->second.link->parameterTypes.push_back(param->getType().getAsString());
-      }
+      it->second.addLink(decl, sourceManager);
     }
   }
 
