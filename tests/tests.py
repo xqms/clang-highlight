@@ -103,7 +103,62 @@ class CHTests(unittest.TestCase):
         tok_help = self.get_token(code, tokens, b'emplace_back();')
         self.assertEqual(tok_help['type'], 'name')
         self.assertEqual(tok_help['link']['qualified_name'],
-                         'std::vector<int>::emplace_back')
+                         'std::vector::emplace_back')
+
+    def test_unspecialize(self):
+        code = """
+        template<class T>
+        class Test
+        {
+        public:
+            void test()
+            {}
+
+            template<class K>
+            void func_template()
+            {}
+
+            template<>
+            void func_template<int>()
+            {}
+
+            template<class K>
+            using Type = Test<K>;
+        };
+
+        using Type2 = bool;
+
+        int main(int argc, char** argv)
+        {
+            Test<int> instance;
+            instance.test();
+            instance.func_template<bool>();
+            instance.func_template<int>();
+
+            Test<int>::Type<bool> other [[maybe_unused]];
+
+            Type2 other2 [[maybe_unused]];
+        }
+        """.encode()
+
+        tokens = self.run_ch(code)
+
+        tok_test = self.get_token(code, tokens, b'test();')
+        self.assertEqual(tok_test['link']['qualified_name'], "Test::test")
+
+        tok_test = self.get_token(code, tokens, b'func_template<bool>();')
+        self.assertEqual(tok_test['link']['qualified_name'], "Test::func_template")
+        self.assertEqual(tok_test['link']['line'], 10)
+
+        tok_test = self.get_token(code, tokens, b'func_template<int>();')
+        self.assertEqual(tok_test['link']['qualified_name'], "Test::func_template")
+        self.assertEqual(tok_test['link']['line'], 14)
+
+        tok_type = self.get_token(code, tokens, b'Type<bool>')
+        self.assertEqual(tok_type['link']['qualified_name'], "Test::Type")
+
+        tok_type = self.get_token(code, tokens, b'Type2 other2')
+        self.assertEqual(tok_type['link']['qualified_name'], "Type2")
 
 
 if __name__ == "__main__":
