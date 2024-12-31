@@ -394,8 +394,11 @@ private:
     if (inner.isNull())
       return;
 
+    if (!sourceManager.isWrittenInMainFile(inner.getBeginLoc()))
+      return;
+
     if (auto tloc = inner.getAs<TemplateSpecializationTypeLoc>()) {
-      if (auto decl = tloc.getTypePtr()->getAsCXXRecordDecl())
+      if (auto decl = tloc.getTypePtr()->getTemplateName().getAsTemplateDecl())
         createLink(sourceManager, tloc.getTemplateNameLoc(), decl);
     } else if (auto tloc = inner.getAs<TypedefTypeLoc>()) {
       createLink(sourceManager, tloc.getBeginLoc(),
