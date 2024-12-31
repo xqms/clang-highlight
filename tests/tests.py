@@ -49,7 +49,10 @@ class CHTests(unittest.TestCase):
 
             # All intermediate is whitespace
             if off > code_offset:
-                self.assertTrue(code[code_offset:off].isspace())
+                self.assertTrue(
+                    code[code_offset:off].isspace(),
+                    f"{repr(code[code_offset:off])} at offset {code_offset} is not whitespace but has no token. Entire code:\n{code.decode()}"
+                )
 
             code_offset = off + length
 
