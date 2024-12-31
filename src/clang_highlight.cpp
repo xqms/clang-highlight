@@ -173,6 +173,32 @@ struct ResultToken {
   std::optional<Link> link;
 };
 
+static const NamedDecl *unspecialize(const NamedDecl *decl) {
+  if (auto func = dyn_cast<FunctionDecl>(decl)) {
+    if (auto instFrom = func->getInstantiatedFromMemberFunction())
+      decl = instFrom;
+
+    if (auto info = func->getTemplateSpecializationInfo()) {
+      if (info->getTemplateSpecializationKind() ==
+          clang::TSK_ImplicitInstantiation) {
+        if (auto instFrom =
+                info->getTemplate()->getInstantiatedFromMemberTemplate()) {
+          decl = instFrom->getTemplatedDecl();
+        }
+      }
+    }
+
+    return decl;
+  }
+
+  if (auto redecl = dyn_cast<RedeclarableTemplateDecl>(decl)) {
+    if (auto instFrom = redecl->getInstantiatedFromMemberTemplate())
+      return instFrom;
+  }
+
+  return decl;
+}
+
 class TokenMap : public std::map<std::size_t, ResultToken> {
 public:
   auto lowerBound(std::size_t offset) {
@@ -249,19 +275,11 @@ public:
       if (!loc.isValid() || !sourceManager.isWrittenInMainFile(loc))
         return;
 
-      auto decl = DRE->getFoundDecl();
+      const NamedDecl *decl = DRE->getFoundDecl();
       if (!decl)
         return;
 
-      if (auto func = dyn_cast<FunctionDecl>(decl)) {
-        // Find underlying template
-        if (auto info = func->getTemplateSpecializationInfo())
-          decl = info->getTemplate()->getTemplatedDecl();
-      }
-
-      auto declLoc = decl->getLocation();
-      if (sourceManager.isWrittenInMainFile(declLoc))
-        return;
+      decl = unspecialize(decl);
 
       auto offset = sourceManager.getFileOffset(loc);
       if (ResultToken *res = tokens.getOrSplitToken(offset)) {
@@ -338,7 +356,12 @@ public:
 
 private:
   void createLink(const SourceManager &sourceManager, SourceLocation fromLoc,
-                  NamedDecl *decl) {
+                  const NamedDecl *decl) {
+    if (!decl)
+      return;
+
+    decl = unspecialize(decl);
+
     if (!decl)
       return;
 
@@ -416,51 +439,11 @@ public:
       if (it == tokens.end() || it->first != offset)
         throw std::runtime_error{"Could not find MemberExpr token"};
 
-      NamedDecl *decl = ME->getMemberDecl();
+      const NamedDecl *decl = ME->getMemberDecl();
       if (!decl)
         return;
 
-      auto declLoc = decl->getLocation();
-      if (sourceManager.isWrittenInMainFile(declLoc))
-        return;
-
-      // TODO: Fix this mess!
-      if (auto method = dyn_cast<CXXMethodDecl>(decl))
-        if (auto instFrom = method->getInstantiatedFromDecl())
-          decl = instFrom;
-      if (auto method = dyn_cast<CXXMethodDecl>(decl))
-        if (auto instFrom = method->getInstantiatedFromMemberFunction())
-          decl = instFrom;
-      if (auto method = dyn_cast<CXXMethodDecl>(decl))
-        if (auto instFrom = method->getInstantiatedFromDecl())
-          decl = instFrom;
-      if (auto method = dyn_cast<CXXMethodDecl>(decl))
-        if (auto instFrom = method->getInstantiatedFromMemberFunction())
-          decl = instFrom;
-      if (auto method = dyn_cast<FunctionTemplateDecl>(decl))
-        if (auto instFrom = method->getInstantiatedFromMemberTemplate())
-          decl = instFrom;
-      if (auto method = dyn_cast<CXXMethodDecl>(decl))
-        if (auto instFrom = method->getInstantiatedFromDecl())
-          decl = instFrom;
-      if (auto method = dyn_cast<CXXMethodDecl>(decl))
-        if (auto instFrom = method->getInstantiatedFromMemberFunction())
-          decl = instFrom;
-      if (auto method = dyn_cast<CXXMethodDecl>(decl)) {
-        if (auto info = method->getTemplateSpecializationInfo()) {
-          if (auto memberInfo = info->getMemberSpecializationInfo())
-            decl = memberInfo->getInstantiatedFrom();
-          else
-            decl = info->getTemplate();
-        }
-      }
-      if (auto method = dyn_cast<FunctionTemplateDecl>(decl))
-        if (auto instFrom = method->getInstantiatedFromMemberTemplate())
-          decl = instFrom;
-
-      // std::string dump;
-      // llvm::raw_string_ostream dumpStream{dump};
-      // decl->dump(dumpStream);
+      decl = unspecialize(decl);
 
       it->second.addLink(decl, sourceManager);
     }
