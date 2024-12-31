@@ -31,6 +31,7 @@ struct Link {
   std::string name;
   std::string qualifiedName;
   std::vector<std::string> parameterTypes;
+  // std::string dump;
   StringRef file;
   unsigned int line;
   unsigned int column;
@@ -318,9 +319,6 @@ public:
       if (!loc.isValid() || !sourceManager.isWrittenInMainFile(loc))
         return;
 
-      // if(auto info = VD->getTypeSourceInfo())
-      //   info->getTypeLoc().dump();
-
       auto offset = sourceManager.getFileOffset(loc);
 
       auto it = tokens.lowerBound(offset);
@@ -569,6 +567,7 @@ void dumpJSON(std::ostream &out, const std::string &file,
                 stream.attribute("column", token.link->column);
                 stream.attribute("name", token.link->name);
                 stream.attribute("qualified_name", token.link->qualifiedName);
+                // stream.attribute("dump", token.link->dump);
 
                 if (!token.link->parameterTypes.empty()) {
                   stream.attributeArray("parameter_types", [&]() {
