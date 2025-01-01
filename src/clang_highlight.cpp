@@ -141,7 +141,7 @@ struct ResultToken {
     }();
   }
 
-  void addLink(const NamedDecl *decl, SourceManager &sourceManager) {
+  void addLink(const NamedDecl *decl, SourceManager &sourceManager, const clang::LangOptions& langOpts) {
     auto declLoc = decl->getLocation();
 
     link = Link{.name = decl->getNameAsString(),
@@ -155,7 +155,7 @@ struct ResultToken {
 
     if (auto func = dyn_cast<FunctionDecl>(decl)) {
       for (auto &param : func->parameters())
-        link->parameterTypes.push_back(param->getType().getAsString());
+        link->parameterTypes.push_back(param->getType().getAsString(langOpts));
     }
   }
 
@@ -287,7 +287,7 @@ public:
         if (dyn_cast<VarDecl>(decl))
           res->type = ResultToken::Type::Variable;
 
-        res->addLink(decl, sourceManager);
+        res->addLink(decl, sourceManager, Result.Context->getLangOpts());
       } else {
         std::cerr << "Looking for offset " << offset << "\n";
         DRE->dump();
@@ -444,7 +444,7 @@ public:
 
       decl = unspecialize(decl);
 
-      it->second.addLink(decl, sourceManager);
+      it->second.addLink(decl, sourceManager, Result.Context->getLangOpts());
     }
   }
 

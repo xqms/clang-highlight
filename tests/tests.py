@@ -111,15 +111,15 @@ class CHTests(unittest.TestCase):
         class Test
         {
         public:
-            void test()
+            void test(int a, bool b)
             {}
 
             template<class K>
-            void func_template()
+            void func_template(int a, bool b)
             {}
 
             template<>
-            void func_template<int>()
+            void func_template<int>(int a, bool b)
             {}
 
             template<class K>
@@ -131,9 +131,9 @@ class CHTests(unittest.TestCase):
         int main(int argc, char** argv)
         {
             Test<int> instance;
-            instance.test();
-            instance.func_template<bool>();
-            instance.func_template<int>();
+            instance.test(0, true);
+            instance.func_template<bool>(0, true);
+            instance.func_template<int>(0, true);
 
             Test<int>::Type<bool> other [[maybe_unused]];
 
@@ -143,15 +143,18 @@ class CHTests(unittest.TestCase):
 
         tokens = self.run_ch(code)
 
-        tok_test = self.get_token(code, tokens, b'test();')
+        tok_test = self.get_token(code, tokens, b'test(0, true);')
         self.assertEqual(tok_test['link']['qualified_name'], "Test::test")
+        self.assertEqual(tok_test['link']['parameter_types'], ['int', 'bool'])
 
-        tok_test = self.get_token(code, tokens, b'func_template<bool>();')
+        tok_test = self.get_token(code, tokens, b'func_template<bool>(0, true);')
         self.assertEqual(tok_test['link']['qualified_name'], "Test::func_template")
+        self.assertEqual(tok_test['link']['parameter_types'], ['int', 'bool'])
         self.assertEqual(tok_test['link']['line'], 10)
 
-        tok_test = self.get_token(code, tokens, b'func_template<int>();')
+        tok_test = self.get_token(code, tokens, b'func_template<int>(0, true);')
         self.assertEqual(tok_test['link']['qualified_name'], "Test::func_template")
+        self.assertEqual(tok_test['link']['parameter_types'], ['int', 'bool'])
         self.assertEqual(tok_test['link']['line'], 14)
 
         tok_type = self.get_token(code, tokens, b'Type<bool>')
