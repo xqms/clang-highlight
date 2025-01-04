@@ -14,7 +14,6 @@ import tempfile
 import json
 import lxml.html
 import sys
-# import html5lib
 
 from typing import Dict
 
@@ -25,29 +24,50 @@ whitespace_regex = re.compile(r'\s+')
 signature_regex = re.compile(r'[^(]* (?P<name>[^ (]+)\s*\((?P<rest>.*)')
 
 template_regex = re.compile(r'template\s*<(?P<rest>.*)')
-template_type_arg_regex = re.compile(r'(class|typename|std::\w+<\w+>)\s*(?P<pack>(\.\.\.)?)\s*(?P<name>.*)')
+template_type_arg_regex = re.compile(
+    r'(class|typename|std::\w+<\w+>)\s*(?P<pack>(\.\.\.)?)\s*(?P<name>.*)')
 
 
-
-def get_type(param: str):
+def signature_split_rest(rest: str):
     """
-    Get type out of a parameter like "int a"
+    Get the parameter string ending with ")" out of the `rest` part matched
+    in signature_regex. We assume this is well-formed C++ and thus we can
+    just count opening and closing parentheses.
+
+    Returns the parameter string and the rest of the rest.
+
+    >>> signature_split_rest('int a, char b) const [[deprecated("reason")]];')
+    ('int a, char b', ' const [[deprecated("reason")]];')
     """
-    if ' ' in param:
-        return param.strip().rpartition(' ')[0]
 
-    return param.strip()
+    level = 1
+    for idx, c in enumerate(rest):
+        if c == '(':
+            level += 1
+        elif c == ')':
+            level -= 1
+            if level == 0:
+                break
+
+    assert level == 0
+
+    return rest[:idx], rest[idx + 1:]
 
 
-def lex_params(params: str, end: str = ')'):
-    # Stupid params lexer
+def lex_params(params: str):
+    """
+    Stupid template parameter lexer
+
+    >>> lex_params("class T, std::some_concept<parameters> b> void func()")
+    (['class T', 'std::some_concept<parameters> b'], ' void func()')
+    """
     ret = []
     current_param = ''
     level = 1
 
     for idx, c in enumerate(params):
         if level == 1:
-            if c == end:
+            if c == '>':
                 if current_param != '':
                     ret.append(current_param)
                 end_idx = idx + 1
@@ -72,17 +92,30 @@ def lex_params(params: str, end: str = ')'):
 
 
 def get_template_params(decl: str):
+    """
+    Get the template parameter list from a template declaration
+
+    >>> get_template_params('template<class T, int c> func(T a, T b);')
+    ['class T', 'int c']
+    """
     tpl_match = template_regex.match(decl)
 
     if not tpl_match:
         return None
 
-    # Stupid template params lexer
-    params, _ = lex_params(tpl_match.group('rest'), '>')
-    # print(f"{decl} -> {tpl_match.group('rest')} -> {params}")
+    params, _ = lex_params(tpl_match.group('rest'))
     return params
 
+
 def forward_template_params(params):
+    """
+    Generate a template argument list that forwards all arguments from a parsed
+    template parameter list.
+
+    >>> params = get_template_params('template<class T, int c> func(T a, T b);')
+    >>> forward_template_params(params)
+    '<T, c>'
+    """
     ret = []
     for p in params:
         is_default = False
@@ -102,7 +135,20 @@ def forward_template_params(params):
     return f"<{', '.join(ret)}>"
 
 
-def generate_template_args(params, exclude=set(), only_non_type=False):
+def generate_template_args(params, exclude=set(), decl=''):
+    """
+    Tries to generate template arguments that make sense using heuristics.
+
+    >>> params = get_template_params('template<class T, int c> func(T a, T b);')
+    >>> args, typedefs, param_set = generate_template_args(params)
+    >>> args
+    '<int,0>'
+    >>> typedefs
+    ['using T = int;']
+    >>> param_set
+    {'T'}
+    """
+
     typedefs = []
     args = []
     parameter_set = set()
@@ -130,6 +176,8 @@ def generate_template_args(params, exclude=set(), only_non_type=False):
                     type = 'char'
                 elif name == 'Ostream':
                     type = 'std::basic_ostream<char>'
+                elif name == 'Istream':
+                    type = 'std::basic_istream<char>'
                 elif name == 'Alloc':
                     if 'Allocator' in exclude:
                         type = 'Allocator'
@@ -160,15 +208,25 @@ def generate_template_args(params, exclude=set(), only_non_type=False):
                         type = 'std::chrono::seconds'
                 elif name == 'P2':
                     type = 'std::ratio<1>'
+                elif name == 'UIntType':
+                    type = 'unsigned int'
+                elif name == 'T' and 'std::complex' in decl:
+                    type = 'double'
+                elif name == 'NonComplex':
+                    type = 'double'
+                elif name == 'T' and 'Istream' in decl and 'T&& value' in decl:
+                    type = 'int&'
 
-                if not only_non_type:
-                    args.append(type)
+                args.append(type)
 
             if name not in exclude:
                 typedefs.append(f"using {name} = {type};")
                 parameter_set.add(name)
         else:
-            args.append('0')
+            if 'basic_istream' in decl:
+                args.append('1')
+            else:
+                args.append('0')
 
     return f"<{','.join(args)}>", typedefs, parameter_set
 
@@ -257,10 +315,6 @@ def handle_class(cls: ET.Element, reference_base: Path, out_base: Path):
             code = cell.text_content()
             code = whitespace_regex.sub(' ', code)
 
-            # if not any([ (ov in code) for ov in page_overloads ]):
-            #     print(f"Skipping {code}")
-            #     continue
-
             for decl in code.split(';'):
                 decl = decl.strip()
                 if not decl:
@@ -282,8 +336,12 @@ def handle_class(cls: ET.Element, reference_base: Path, out_base: Path):
         cls_type += tpl_args
 
     out = f"""
+
+#define static_assert(...)
+
 #include {header}
 #include <utility>
+#include <tuple>
 
 #pragma GCC diagnostic ignored "-Wreturn-type"
 #pragma GCC diagnostic ignored "-Wunused-local-typedef"
@@ -292,6 +350,23 @@ template<typename T>
 typename std::add_rvalue_reference<T>::type my_declval() noexcept
 {{
 }}
+
+template<typename Sig>
+struct Signature;
+
+template<typename R, typename ...Args>
+struct Signature<R(*)(Args...)>
+{{
+    using ArgTuple = std::tuple<Args...>;
+    static constexpr std::size_t ArgCount = sizeof...(Args);
+
+    template<std::size_t N>
+    using ArgType = decltype(std::get<N>(my_declval<ArgTuple>()));
+
+    template<std::size_t N>
+    static ArgType<N> arg() noexcept
+    {{}}
+}};
 
 struct MyPred {{
     bool operator()(auto) {{ return true; }}
@@ -308,6 +383,10 @@ using MyType = {cls_type};
         if '= delete' in decl:
             continue
 
+        # Not a function?
+        if '(' not in decl:
+            continue
+
         num += 1
         decl_tpl_params = get_template_params(decl)
         decl_tpl_forward = ''
@@ -316,7 +395,7 @@ using MyType = {cls_type};
         decl_tpl_decl = ''
         if decl_tpl_params:
             decl_tpl_args, decl_typedefs, _ = generate_template_args(
-                decl_tpl_params, exclude=tpl_parameter_set)
+                decl_tpl_params, exclude=tpl_parameter_set, decl=decl)
             decl_tpl_decl = f"template <{', '.join(decl_tpl_params)}>"
             decl_tpl_forward = forward_template_params(decl_tpl_params)
 
@@ -326,18 +405,7 @@ using MyType = {cls_type};
             name = name_match.group('name')
             rest = name_match.group('rest')
 
-            params, rest = lex_params(rest)
-
-            # # ignore argument packs
-            # params = [p for p in params if '...' not in p]
-
-            # ignore defaulted parameters
-            params = [p for p in params if '=' not in p]
-
-            # extract type
-            params = [get_type(p) for p in params if len(p.strip()) != 0]
-
-            params = [f"my_declval<{p}>()" for p in params]
+            param_str, rest_after_params = signature_split_rest(rest)
 
             if name.startswith('operator'):
                 # Operators rarely need explicit template arguments, and this is
@@ -345,22 +413,33 @@ using MyType = {cls_type};
                 # lot (e.g. std::pair's operator== overload).
                 decl_tpl_forward = ''
 
-            # call = f"static_cast<void>(/* -> */ {name}{decl_tpl_args}({', '.join(params)}));"
+            if 'friend ' in decl:
+                # If this is a friend function declaration, it is declared
+                # inside the class and thus can use the class name to refer
+                # to the specific template instantiation. We emulate that
+                # by declaring a local typedef.
+                local_name = cls.attrib['name'].rpartition('::')[2]
+                local_typedef = f"using {local_name} = MyType;"
+            else:
+                local_typedef = ''
 
             call = f"""{decl_tpl_decl}
-    void call{num}() {{"""
+    struct Call{num} {{
+        { local_typedef }
+        static void signature({param_str});
+        void call()
+        {{
+            using Sig = Signature<decltype(&signature)>;
+            []<auto... Is>(const std::index_sequence<Is...>&){{
+                static_cast<void>(/* -> */ {name}{decl_tpl_forward}(Sig::template arg<Is>()...));
+            }}(std::make_index_sequence<Sig::ArgCount>());
+        }}
+    }};"""
 
-            if 'friend ' in decl:
-                local_name = cls.attrib['name'].rpartition('::')[2]
-                call += f"\n        using {local_name} = MyType;"
-
-            call += f"""
-        static_cast<void>(/* -> */ {name}{decl_tpl_forward}({', '.join(params)}));
-    }}"""
-
+            # Add an explicit instantiation with the declared template arguments
             if decl_tpl_decl:
                 call += f"""
-    template void call{num}{decl_tpl_args}();"""
+    template struct Call{num}{decl_tpl_args};"""
         else:
             call = ""
             # call = decl

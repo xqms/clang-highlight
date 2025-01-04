@@ -81,8 +81,18 @@ if __name__ == "__main__":
         result = list(zip(files, result))
         result = sorted(result, key=lambda x: x[1][1])
 
+        print(f"Failures per file:")
         for f, res in result:
             if res[1] != 0:
                 print(f, res[1])
 
         print(f"Failures in total: {sum([res[1][1] for res in result])}")
+
+        functions = {}
+        for f, res in result:
+            infos = res[0]
+            for info in infos:
+                functions.setdefault(info['overload']['qualified_name'], []).append(info)
+
+        with open(base / 'overloads.json', 'w') as f:
+            json.dump(functions, f, indent=2)
