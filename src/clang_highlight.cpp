@@ -143,7 +143,8 @@ struct ResultToken {
     }();
   }
 
-  void addLink(const NamedDecl *decl, SourceManager &sourceManager, const clang::LangOptions& langOpts) {
+  void addLink(const NamedDecl *decl, SourceManager &sourceManager,
+               const clang::LangOptions &langOpts) {
     auto declLoc = decl->getLocation();
 
     link = Link{.name = decl->getNameAsString(),
