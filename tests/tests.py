@@ -128,6 +128,10 @@ class CHTests(unittest.TestCase):
 
         using Type2 = bool;
 
+        template<class T>
+        void func(T)
+        {}
+
         int main(int argc, char** argv)
         {
             Test<int> instance;
@@ -138,6 +142,8 @@ class CHTests(unittest.TestCase):
             Test<int>::Type<bool> other [[maybe_unused]];
 
             Type2 other2 [[maybe_unused]];
+
+            func(0);
         }
         """.encode()
 
@@ -162,6 +168,10 @@ class CHTests(unittest.TestCase):
 
         tok_type = self.get_token(code, tokens, b'Type2 other2')
         self.assertEqual(tok_type['link']['qualified_name'], "Type2")
+
+        tok_call = self.get_token(code, tokens, b'func(0);')
+        self.assertEqual(tok_call['link']['qualified_name'], "func")
+        self.assertEqual(tok_call['link']['parameter_types'], ['T'])
 
 
 if __name__ == "__main__":

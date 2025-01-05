@@ -1,6 +1,7 @@
 // clang-highlight produces semantic highlighting information
 // Author: Max Schwarz <max.schwarz@online.de>
 
+#include <clang/Basic/Specifiers.h>
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wnonnull"
 #include <clang/AST/NestedNameSpecifier.h>
@@ -185,10 +186,14 @@ static const NamedDecl *unspecialize(const NamedDecl *decl) {
       decl = instFrom;
 
     if (auto info = func->getTemplateSpecializationInfo()) {
-      if (info->getTemplateSpecializationKind() ==
-          clang::TSK_ImplicitInstantiation) {
+      auto kind = info->getTemplateSpecializationKind();
+      if (kind == clang::TSK_ImplicitInstantiation ||
+          kind == clang::TSK_ExplicitInstantiationDeclaration) {
         if (auto instFrom =
                 info->getTemplate()->getInstantiatedFromMemberTemplate()) {
+          decl = instFrom->getTemplatedDecl();
+        }
+        else if (auto instFrom = info->getTemplate()) {
           decl = instFrom->getTemplatedDecl();
         }
       }
