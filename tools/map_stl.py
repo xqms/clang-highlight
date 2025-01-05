@@ -285,8 +285,6 @@ def handle_class(cls: ET.Element, reference_base: Path, out_base: Path):
 
         pages.setdefault(link, set()).add(overload.attrib['name'])
 
-    # print(pages)
-
     for page, page_overloads in sorted(pages.items()):
         try:
             page_tree = lxml.html.fromstring(
@@ -514,6 +512,54 @@ def process_file(path: Path, ch: Path, print_errors=False):
     return ret, (num_page_comments - len(ret))
 
 
+def get_symbols(index: ET.ElementTree):
+    symbols = {}
+
+    alias_symbols = {}
+
+    # Global things
+    for thing in ('typedef', 'const', 'function'):
+        for t in index.findall(thing):
+            try:
+                symbols[t.attrib['name']] = t.attrib['link']
+            except KeyError:
+                if 'alias' in t.attrib:
+                    alias_symbols[t.attrib['name']] = t.attrib['alias']
+                else:
+                    print(f"Thing {t.attrib['name']} has no link!", file=sys.stderr)
+
+    # Classes
+    for cls in index.findall('class'):
+        cls_name = cls.attrib['name']
+        cls_link = cls.attrib['link']
+        symbols[cls_name] = cls_link
+
+        def link(t):
+            tl = t.attrib.get('link', '.')
+            if tl == '.':
+                return cls_link
+            else:
+                return tl
+
+        for thing in ('typedef', 'const', 'function'):
+            for t in cls.findall(thing):
+                t_name = f'{cls_name}::{t.attrib["name"]}'
+                symbols[t_name] = link(t)
+
+        cons = cls.find('constructor')
+        if cons is not None:
+            symbols[f"{cls_name}::{cls_name.rpartition('::')[2]}"] = link(cons)
+
+        des = cls.find('destructor')
+        if des is not None:
+            symbols[f"{cls_name}::~{cls_name.rpartition('::')[2]}"] = link(des)
+
+    for name, to in alias_symbols.items():
+        symbols[name] = symbols[to]
+
+    return symbols
+
+
 def work(workdir: Path):
     base = Path(__file__).parent
     ch = base.parent / 'build' / 'clang-highlight'
@@ -537,6 +583,8 @@ def work(workdir: Path):
 
     tree = ET.parse(extracted_path / 'index-functions-cpp.xml')
 
+    symbols = get_symbols(tree)
+
     reference_base = extracted_path / 'reference' / 'en.cppreference.com' / 'w'
 
     out_base = workdir / 'stl_calls'
@@ -552,7 +600,9 @@ def work(workdir: Path):
     print("\nResolving STL calls...")
 
     pool = ThreadPool()
-    result = list(tqdm(pool.imap(lambda x: process_file(x, ch), files), total=len(files)))
+    result = list(
+        tqdm(pool.imap(lambda x: process_file(x, ch), files),
+             total=len(files)))
 
     result = list(zip(files, result))
     result = sorted(result, key=lambda x: x[1][1])
@@ -568,10 +618,11 @@ def work(workdir: Path):
     for f, res in result:
         infos = res[0]
         for info in infos:
-            functions.setdefault(info['overload']['qualified_name'], []).append(info)
+            functions.setdefault(info['overload']['qualified_name'],
+                                 []).append(info)
 
     with open(Path.home() / '.cache' / 'clang_highlight_stl.json', 'w') as f:
-        json.dump(functions, f, indent=2)
+        json.dump({"symbols": symbols, "overloads": functions}, f, indent=2)
 
 
 if __name__ == "__main__":
@@ -579,5 +630,3 @@ if __name__ == "__main__":
         work(Path(workdir))
 
     base = Path(__file__).parent
-
-
