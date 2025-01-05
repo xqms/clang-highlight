@@ -27,11 +27,13 @@ using namespace clang::ast_matchers;
 using namespace clang::tooling;
 using namespace llvm;
 
+static constexpr bool LINK_DUMP = false;
+
 struct Link {
   std::string name;
   std::string qualifiedName;
   std::vector<std::string> parameterTypes;
-  // std::string dump;
+  std::string dump;
   StringRef file;
   unsigned int line;
   unsigned int column;
@@ -150,8 +152,10 @@ struct ResultToken {
                 .line = sourceManager.getSpellingLineNumber(declLoc),
                 .column = sourceManager.getSpellingColumnNumber(declLoc)};
 
-    // llvm::raw_string_ostream dumpStream{link->dump};
-    // decl->dump(dumpStream);
+    if constexpr (LINK_DUMP) {
+      llvm::raw_string_ostream dumpStream{link->dump};
+      decl->dump(dumpStream);
+    }
 
     if (auto func = dyn_cast<FunctionDecl>(decl)) {
       for (auto &param : func->parameters())
@@ -568,7 +572,9 @@ void dumpJSON(std::ostream &out, const std::string &file,
                 stream.attribute("column", token.link->column);
                 stream.attribute("name", token.link->name);
                 stream.attribute("qualified_name", token.link->qualifiedName);
-                // stream.attribute("dump", token.link->dump);
+
+                if constexpr (LINK_DUMP)
+                  stream.attribute("dump", token.link->dump);
 
                 if (!token.link->parameterTypes.empty()) {
                   stream.attributeArray("parameter_types", [&]() {
