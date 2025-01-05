@@ -199,7 +199,9 @@ static const NamedDecl *unspecialize(const NamedDecl *decl) {
 
   if (auto redecl = dyn_cast<RedeclarableTemplateDecl>(decl)) {
     if (auto instFrom = redecl->getInstantiatedFromMemberTemplate())
-      return instFrom;
+      return instFrom->getTemplatedDecl();
+    else
+      return redecl->getTemplatedDecl();
   }
 
   return decl;
