@@ -14,6 +14,9 @@ import tempfile
 import json
 import lxml.html
 import sys
+from multiprocessing.pool import ThreadPool
+
+from tqdm import tqdm
 
 from typing import Dict
 
@@ -264,9 +267,9 @@ def handle_class(cls: ET.Element, reference_base: Path, out_base: Path):
 
     # ... and parse it
     if 'class' not in class_decl and 'struct' not in class_decl:
-        print(
-            f"class decl '{class_decl}' does not contain 'struct' or 'class'",
-            file=sys.stderr)
+        # print(
+        #     f"class decl '{class_decl}' does not contain 'struct' or 'class'",
+        #     file=sys.stderr)
         return
 
     tpl_params = get_template_params(class_decl)
@@ -459,16 +462,69 @@ using MyType = {cls_type};
     with open(out_path, 'w') as f:
         f.write(out)
 
+    return out_path
 
-if __name__ == "__main__":
+
+def process_file(path: Path, ch: Path, print_errors=False):
+    with tempfile.TemporaryDirectory(delete=False) as build_dir:
+        build_dir = Path(build_dir)
+
+        with open(build_dir / 'compile_commands.json', 'w') as db_file:
+            db_file.write(
+                json.dumps([{
+                    'directory': str(build_dir),
+                    'command': f'/usr/bin/c++ -DNDEBUG -std=c++23 {path}',
+                    'file': str(path),
+                }]))
+
+        stderr = None if print_errors else subprocess.DEVNULL
+
+        result = subprocess.run(
+            [ch, '-p', build_dir, '--json-out', '--punctuation=skip', path],
+            stdout=subprocess.PIPE,
+            stderr=stderr,
+            check=True)
+
+    with open(path, 'rb') as f:
+        code = f.read()
+
+    tokens = json.loads(result.stdout)["tokens"]
+
+    ret = []
+    num_page_comments = 0
+
+    for idx, token in enumerate(tokens):
+        type = token['type']
+        if type == 'comment':
+            text = code[token['offset']:token['offset'] +
+                        token['length']].decode()
+            if text.startswith('// PAGE: '):
+                current_page = text[9:].strip()
+                num_page_comments += 1
+            if text == '/* -> */':
+                dest = tokens[idx + 1]
+                if 'link' not in dest:
+                    continue
+
+                ret.append({
+                    'page': current_page,
+                    'overload': dest['link'],
+                })
+
+    return ret, (num_page_comments - len(ret))
+
+
+def work(workdir: Path):
     base = Path(__file__).parent
+    ch = base.parent / 'build' / 'clang-highlight'
 
-    archive_path = base / 'cppreference.tar.xz'
+    archive_path = workdir / 'cppreference.tar.xz'
+
     if not archive_path.exists():
         print('Downloading cppreference archive')
         subprocess.run(['wget', DOWNLOAD_URL, f'-O{archive_path}'], check=True)
 
-    extracted_path = base / 'cppreference'
+    extracted_path = workdir / 'cppreference'
     if not (extracted_path / 'Makefile').exists():
         print('Extracting...')
         extracted_path.mkdir(exist_ok=True)
@@ -483,8 +539,45 @@ if __name__ == "__main__":
 
     reference_base = extracted_path / 'reference' / 'en.cppreference.com' / 'w'
 
-    out_base = base / 'stl_calls'
+    out_base = workdir / 'stl_calls'
     out_base.mkdir(exist_ok=True)
 
+    print("\nGenerating STL calls...\n")
+    files = []
     for cls in tree.findall('class'):
-        handle_class(cls, reference_base, out_base)
+        f = handle_class(cls, reference_base, out_base)
+        if f:
+            files.append(f)
+
+    print("\nResolving STL calls...")
+
+    pool = ThreadPool()
+    result = list(tqdm(pool.imap(lambda x: process_file(x, ch), files), total=len(files)))
+
+    result = list(zip(files, result))
+    result = sorted(result, key=lambda x: x[1][1])
+
+    print(f"Failures per file:")
+    for f, res in result:
+        if res[1] != 0:
+            print(f, res[1])
+
+    print(f"Failures in total: {sum([res[1][1] for res in result])}")
+
+    functions = {}
+    for f, res in result:
+        infos = res[0]
+        for info in infos:
+            functions.setdefault(info['overload']['qualified_name'], []).append(info)
+
+    with open(Path.home() / '.cache' / 'clang_highlight_stl.json', 'w') as f:
+        json.dump(functions, f, indent=2)
+
+
+if __name__ == "__main__":
+    with tempfile.TemporaryDirectory(prefix='stl_map') as workdir:
+        work(Path(workdir))
+
+    base = Path(__file__).parent
+
+
