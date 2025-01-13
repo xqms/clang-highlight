@@ -97,7 +97,13 @@ target_link_libraries(clang-highlight PRIVATE
 )
 
 if(DEFINED SKBUILD_PROJECT_NAME)
-    install(TARGETS clang-highlight DESTINATION ${SKBUILD_PROJECT_NAME})
+    # Hack to make importlib.resources work properly (the logic in
+    # scikit-build-core for this expects a file in the package root).
+    # Furthermore, our executable needs to be in a sub-module.
+    file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/helper.txt" "")
+    install(FILES "${CMAKE_CURRENT_BINARY_DIR}/helper.txt" DESTINATION ${SKBUILD_PROJECT_NAME})
+
+    install(TARGETS clang-highlight DESTINATION ${SKBUILD_PROJECT_NAME}/_util)
 endif()
 
 # Tests
