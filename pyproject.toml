@@ -1,0 +1,39 @@
+[build-system]
+requires = ["scikit-build-core>=0.10"]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "clang-highlight"
+version = "0.1.0"
+authors = [
+  {name = "Max Schwarz", email = "max.schwarz@online.de"},
+]
+description = "Highlight C/C++ code using information from clang's AST"
+readme = "README.md"
+classifiers = [
+  "Development Status :: 3 - Alpha",
+
+  # Indicate who your project is intended for
+  "Intended Audience :: Developers",
+  "Intended Audience :: Developers",
+  "Intended Audience :: End Users/Desktop",
+
+  "Topic :: Text Processing :: Filters",
+  "Topic :: Utilities",
+
+  # Pick your license as you wish (see also "license" above)
+  "License :: OSI Approved :: MIT License",
+
+  # Specify the Python versions you support here.
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.12",
+]
+
+requires-python = ">=3.12"
+dependencies = [
+  "tqdm",
+]
+
+[tool.scikit-build]
+minimum-version = "build-system.requires"
+build-dir = "build/{wheel_tag}"

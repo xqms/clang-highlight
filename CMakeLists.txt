@@ -8,10 +8,19 @@ set(VERSION_PATCH 0)
 
 set(CMAKE_CXX_STANDARD 23)
 
-find_package(LLVM REQUIRED)
+foreach(llvm_version 20.0 19.1 18.1 17.0)
+    find_package(LLVM "${llvm_version}" QUIET)
+    if(LLVM_FOUND)
+        break()
+    endif()
+endforeach()
+
+if(NOT LLVM_FOUND)
+    message(FATAL_ERROR "Could not find LLVM: ${LLVM_FOUND}")
+endif()
+
 message(STATUS "Found LLVM ${LLVM_PACKAGE_VERSION}")
 message(STATUS "Using LLVMConfig.cmake in: ${LLVM_DIR}")
-
 
 function(find_clang_lib name)
     find_library(clang_${name} clang${name} PATHS ${LLVM_LIBRARY_DIRS})
@@ -86,6 +95,10 @@ target_link_libraries(clang-highlight PRIVATE
     llvm::FrontendOpenMP
     llvm::WindowsDriver
 )
+
+if(DEFINED SKBUILD_PROJECT_NAME)
+    install(TARGETS clang-highlight DESTINATION ${SKBUILD_PROJECT_NAME})
+endif()
 
 # Tests
 if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
