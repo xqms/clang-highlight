@@ -52,6 +52,7 @@ class HighlightedCode:
     filename: Path
     code: bytes
     tokens: List[Token]
+    diagnostics: str
 
     def __iter__(self):
         """

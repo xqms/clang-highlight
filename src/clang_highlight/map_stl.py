@@ -16,9 +16,8 @@ from multiprocessing.pool import ThreadPool
 
 from tqdm import tqdm
 
-from typing import Dict
-
-from .data import Token, TokenType, HighlightedCode, Link
+from .data import TokenType, HighlightedCode, Link
+import clang_highlight
 
 CACHE_FILE = Path.home() / '.cache' / 'clang_highlight_stl.json'
 DOWNLOAD_URL = "https://github.com/PeterFeicht/cppreference-doc/releases/download/v20241110/cppreference-doc-20241110.tar.xz"
@@ -124,9 +123,7 @@ def forward_template_params(params):
     """
     ret = []
     for p in params:
-        is_default = False
         if '=' in p:
-            is_default = True
             p, _, type = p.partition('=')
             p = p.strip()
             type = type.strip()
@@ -472,8 +469,12 @@ def process_file(path: Path):
     ret = []
     num_page_comments = 0
     take_next = False
+    current_page = None
 
     for text, token in highlighted:
+        if not token:
+            continue
+
         if take_next:
             if token.link:
                 ret.append({
@@ -484,7 +485,7 @@ def process_file(path: Path):
             take_next = False
             continue
 
-        if token.type == clang_highlight.TokenType.COMMENT:
+        if token.type == TokenType.COMMENT:
             if text.startswith('// PAGE: '):
                 current_page = text[9:].strip()
                 num_page_comments += 1
@@ -578,7 +579,6 @@ def work(workdir: Path):
             files.append(f)
 
     print("\nResolving STL calls...")
-
     pool = ThreadPool()
     result = list(
         tqdm(pool.imap(lambda x: process_file(x), files),
@@ -587,7 +587,7 @@ def work(workdir: Path):
     result = list(zip(files, result))
     result = sorted(result, key=lambda x: x[1][1])
 
-    print(f"Failures per file:")
+    print("STL mapping failures per file:")
     for f, res in result:
         if res[1] != 0:
             print(f, res[1])
@@ -601,8 +601,14 @@ def work(workdir: Path):
             functions.setdefault(info['overload']['qualified_name'],
                                  []).append(info)
 
+    def serialize_path(p):
+        if isinstance(p, Path):
+            return str(p)
+
+        raise TypeError(f"Invalid type for JSON: {type(p)}")
+
     with open(CACHE_FILE, 'w') as f:
-        json.dump({"symbols": symbols, "overloads": functions}, f, indent=2)
+        json.dump({"symbols": symbols, "overloads": functions}, f, indent=2, default=serialize_path)
 
 
 def overload_match(overload: dict, link: Link):

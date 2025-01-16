@@ -68,7 +68,10 @@ def run(filename: Path = None,
             _ch, '-p', ch_build_dir, f'--punctuation={punctuation}',
             '--json-out', code_filename
         ]
-        result = subprocess.run(cmd, stdout=subprocess.PIPE, check=True)
+        result = subprocess.run(cmd,
+                                stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE,
+                                check=True)
 
         with open(code_filename, 'rb') as f:
             code = f.read()
@@ -77,12 +80,15 @@ def run(filename: Path = None,
 
     def parse_token(d):
         return dacite.from_dict(data_class=Token,
-                             data=d,
-                             config=dacite.Config(cast=[TokenType, Path]))
+                                data=d,
+                                config=dacite.Config(cast=[TokenType, Path]))
 
-    tokens = [ parse_token(d) for d in data['tokens'] ]
+    tokens = [parse_token(d) for d in data['tokens']]
 
-    highlighted = HighlightedCode(filename=filename, code=code, tokens=tokens)
+    highlighted = HighlightedCode(filename=filename,
+                                  code=code,
+                                  tokens=tokens,
+                                  diagnostics=result.stderr)
 
     if cppref:
         map_stl.resolve_stl(highlighted)
