@@ -39,3 +39,8 @@ dependencies = [
 [tool.scikit-build]
 minimum-version = "build-system.requires"
 build-dir = "build/{wheel_tag}"
+
+[dependency-groups]
+dev = [
+    "ruff>=0.9.2",
+]
