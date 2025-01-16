@@ -1,62 +1,22 @@
 import subprocess
 import tempfile
 import json
-from dataclasses import dataclass
+import dacite
 from typing import List, Optional
 from pathlib import Path
 from contextlib import contextmanager
 import importlib.resources
+
+from .data import Token, HighlightedCode, TokenType, Link
+from . import map_stl
+
+__all__ = ['Token', 'TokenType', 'Link', 'HighlightedCode', 'run']
 
 # Find our C++ part
 _ch = None
 with importlib.resources.path('clang_highlight._util', 'clang-highlight') as p:
     _ch = p
     assert _ch.exists(), "Could not find clang-highlight utility"
-
-
-@dataclass
-class HighlightedCode:
-    """
-    Code with highlighting information
-    """
-
-    filename: Path
-    code: bytes
-    tokens: List[dict]
-
-    def __iter__(self):
-        """
-        Iterate over the tokenized code. Yields each text fragment and its
-        corresponding token. Whitespace and ignored punctuation will result in
-        `Ǹone` token.
-
-        Example:
-        >>> code = "void test() { }"
-        >>> for text, token in run(code=code):
-        ...     print(f"{text:<10} -> {token['type'] if token else None}")
-        ...
-        void       -> keyword
-                   -> None
-        test       -> name
-        (          -> punctuation
-        )          -> punctuation
-                   -> None
-        {          -> punctuation
-                   -> None
-        }          -> punctuation
-        """
-
-        offset = 0
-        for token in self.tokens:
-            to = token['offset']
-            tl = token['length']
-
-            if to > offset:
-                yield self.code[offset:token['offset']].decode('utf8'), None
-
-            yield self.code[to:to + tl].decode('utf8'), token
-
-            offset = to + tl
 
 
 @contextmanager
@@ -84,7 +44,9 @@ def code_file_context(filename: Path = None, code: str = None):
     if filename:
         yield Path(filename)
     elif code:
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.cpp', delete_on_close=False) as f:
+        with tempfile.NamedTemporaryFile(mode='w',
+                                         suffix='.cpp',
+                                         delete_on_close=False) as f:
             f.write(code)
             f.close()
             yield Path(f.name)
@@ -96,7 +58,8 @@ def run(filename: Path = None,
         code: str = None,
         args=['-DNDEBUG', '-std=c++23'],
         build_dir=None,
-        punctuation='keep') -> HighlightedCode:
+        punctuation='keep',
+        cppref=False) -> HighlightedCode:
 
     with code_file_context(filename, code) as code_filename, \
          build_dir_context(filename, build_dir, args) as ch_build_dir:
@@ -112,4 +75,16 @@ def run(filename: Path = None,
 
     data = json.loads(result.stdout)
 
-    return HighlightedCode(filename=filename, code=code, tokens=data['tokens'])
+    def parse_token(d):
+        return dacite.from_dict(data_class=Token,
+                             data=d,
+                             config=dacite.Config(cast=[TokenType, Path]))
+
+    tokens = [ parse_token(d) for d in data['tokens'] ]
+
+    highlighted = HighlightedCode(filename=filename, code=code, tokens=tokens)
+
+    if cppref:
+        map_stl.resolve_stl(highlighted)
+
+    return highlighted
