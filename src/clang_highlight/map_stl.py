@@ -13,6 +13,7 @@ import lxml.html
 import sys
 import dataclasses
 from multiprocessing.pool import ThreadPool
+from urllib.parse import quote
 
 from tqdm import tqdm
 
@@ -316,15 +317,18 @@ def handle_class(cls: ET.Element, reference_base: Path, out_base: Path):
             if since_version > 23 or until_version <= 23:
                 continue
 
-            code = cell.text_content()
-            code = whitespace_regex.sub(" ", code)
+            verbatim_code = cell.text_content()
 
-            for decl in code.split(";"):
-                decl = decl.strip()
+            for verbatim_decl in verbatim_code.split(";"):
+                decl = whitespace_regex.sub(" ", verbatim_decl).strip()
                 if not decl:
                     continue
 
-                functions[decl] = page
+                # Text fragment directives do not work across block tag
+                # boundaries. So extract the last line.
+                fragment = verbatim_decl.rpartition("\n")[2].strip()
+
+                functions[decl] = (page, fragment)
 
     if not functions:
         return
@@ -382,7 +386,8 @@ using MyType = {cls_type};
 """
 
     num = 0
-    for decl, page in functions.items():
+    for decl, page_and_fragment in functions.items():
+        page, fragment = page_and_fragment
         if "= delete" in decl:
             continue
 
@@ -448,8 +453,9 @@ using MyType = {cls_type};
             call = ""
             # call = decl
 
+        frag_directive = f"#:~:text={quote(fragment)}"
         out += f"""
-    // PAGE: {page}
+    // PAGE: {page}{frag_directive}
     // {decl}
     {call}
 """
