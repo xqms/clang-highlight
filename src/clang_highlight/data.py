@@ -3,6 +3,7 @@ from typing import Optional, List
 from enum import Enum
 from pathlib import Path
 
+
 @dataclass
 class Link:
     file: Path
@@ -15,18 +16,18 @@ class Link:
 
 
 class TokenType(Enum):
-    WHITESPACE = 'whitespace'
-    KEYWORD = 'keyword'
-    NAME = 'name'
-    STRING_LITERAL = 'string_literal'
-    NUMBER_LITERAL = 'number_literal'
-    OTHER_LITERAL = 'other_literal'
-    OPERATOR = 'operator'
-    PUNCTUATION = 'punctuation'
-    COMMENT = 'comment'
-    PREPROCESSOR = 'preprocessor'
-    VARIABLE = 'variable'
-    OTHER = 'other'
+    WHITESPACE = "whitespace"
+    KEYWORD = "keyword"
+    NAME = "name"
+    STRING_LITERAL = "string_literal"
+    NUMBER_LITERAL = "number_literal"
+    OTHER_LITERAL = "other_literal"
+    OPERATOR = "operator"
+    PUNCTUATION = "punctuation"
+    COMMENT = "comment"
+    PREPROCESSOR = "preprocessor"
+    VARIABLE = "variable"
+    OTHER = "other"
 
 
 @dataclass
@@ -79,9 +80,9 @@ class HighlightedCode:
         offset = 0
         for token in self.tokens:
             if token.offset > offset:
-                yield self.code[offset:token.offset].decode('utf8'), None
+                yield self.code[offset : token.offset].decode("utf8"), None
 
             end = token.offset + token.length
-            yield self.code[token.offset:end].decode('utf8'), token
+            yield self.code[token.offset : end].decode("utf8"), token
 
             offset = end
