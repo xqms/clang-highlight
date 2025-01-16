@@ -3,7 +3,17 @@
 	"lspclient": {
 		"servers": {
 			"python": {
-				"command": ["%{Project:NativePath}/venv/bin/python", "-m", "pylsp", "--check-parent-process"]
+				"command": ["%{Project:NativePath}/.venv/bin/python", "-m", "pylsp", "--check-parent-process"],
+				"settings": {
+					"pylsp": {
+						"plugins": {
+							"ruff": {
+								"enabled": true,
+								"formatEnabled": true
+							}
+						}
+					}
+				}
 			}
 		}
 	}

@@ -44,3 +44,7 @@ build-dir = "build/{wheel_tag}"
 dev = [
     "ruff>=0.9.2",
 ]
+ide = [
+    "python-lsp-ruff>=2.2.2",
+    "python-lsp-server>=1.12.0",
+]
