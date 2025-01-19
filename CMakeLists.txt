@@ -8,37 +8,54 @@ set(VERSION_PATCH 0)
 
 set(CMAKE_CXX_STANDARD 23)
 
-foreach(llvm_version 20.0 19.1 18.1 17.0)
-    find_package(LLVM "${llvm_version}" QUIET)
-    if(LLVM_FOUND)
-        break()
-    endif()
-endforeach()
-
-if(NOT LLVM_FOUND)
-    message(FATAL_ERROR "Could not find LLVM: ${LLVM_FOUND}")
+if(DEFINED ENV{LLVM_DIR})
+    set(LLVM_BIN_DIR $ENV{LLVM_DIR}/bin)
 endif()
 
-message(STATUS "Found LLVM ${LLVM_PACKAGE_VERSION}")
-message(STATUS "Using LLVMConfig.cmake in: ${LLVM_DIR}")
+find_program(LLVM_CONFIG llvm-config HINTS
+    "/usr/lib/llvm-20/bin"
+    "/usr/lib/llvm-19/bin"
+    "/usr/lib/llvm-18/bin"
+    "${LLVM_BIN_DIR}"
+    REQUIRED
+)
+
+function(llvm_config output_var)
+    execute_process(
+        COMMAND ${LLVM_CONFIG} ${ARGN}
+        OUTPUT_VARIABLE output
+        COMMAND_ERROR_IS_FATAL ANY
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+    )
+    set(${output_var} ${output} PARENT_SCOPE)
+endfunction()
+
+llvm_config(LLVM_VERSION --version)
+message(STATUS "Found LLVM version ${LLVM_VERSION}")
+
+llvm_config(LLVM_INCLUDE_DIR --includedir)
+message(STATUS "LLVM include dir: ${LLVM_INCLUDE_DIR}")
+llvm_config(LLVM_LIBRARY_DIR --libdir)
+message(STATUS "LLVM library dir: ${LLVM_LIBRARY_DIR}")
 
 function(find_clang_lib name)
-    find_library(clang_${name} clang${name} PATHS ${LLVM_LIBRARY_DIRS})
+    find_library(clang_${name} clang${name} PATHS ${LLVM_LIBRARY_DIR})
 
     add_library(clang${name} INTERFACE)
-    target_include_directories(clang${name} SYSTEM INTERFACE ${LLVM_INCLUDE_DIRS})
+    target_include_directories(clang${name} SYSTEM INTERFACE ${LLVM_INCLUDE_DIR})
     target_link_libraries(clang${name} INTERFACE ${clang_${name}})
     add_library(clang::${name} ALIAS clang${name})
 endfunction()
 
-function(find_llvm_lib name)
-    llvm_map_components_to_libnames(llvm_libs ${name})
+llvm_config(LLVM_LIBS_RAW --link-static --libnames Core Support Option ProfileData FrontendOpenMP WindowsDriver)
+separate_arguments(LLVM_LIBS_RAW UNIX_COMMAND ${LLVM_LIBS_RAW})
 
-    add_library(llvm${name} INTERFACE)
-    target_include_directories(llvm${name} SYSTEM INTERFACE ${LLVM_INCLUDE_DIRS})
-    target_link_libraries(llvm${name} INTERFACE ${llvm_libs})
-    add_library(llvm::${name} ALIAS llvm${name})
-endfunction()
+add_library(llvm_libs INTERFACE)
+target_include_directories(llvm_libs SYSTEM INTERFACE ${LLVM_INCLUDE_DIR})
+foreach(lib ${LLVM_LIBS_RAW})
+    target_link_libraries(llvm_libs INTERFACE ${LLVM_LIBRARY_DIR}/${lib})
+endforeach()
+add_library(llvm::libs ALIAS llvm_libs)
 
 find_clang_lib(Analysis)
 find_clang_lib(AST)
@@ -55,13 +72,6 @@ find_clang_lib(Parse)
 find_clang_lib(Tooling)
 find_clang_lib(Support)
 
-find_llvm_lib(Core)
-find_llvm_lib(Support)
-find_llvm_lib(Option)
-find_llvm_lib(ProfileData)
-find_llvm_lib(FrontendOpenMP)
-find_llvm_lib(WindowsDriver)
-
 add_executable(clang-highlight
     src/clang_highlight.cpp
 )
@@ -71,7 +81,7 @@ target_compile_definitions(clang-highlight PRIVATE
     CH_VERSION_PATCH=${VERSION_PATCH}
 )
 target_compile_options(clang-highlight PRIVATE
-    "-Wall"
+    "-Wall" "-fno-rtti"
 )
 target_link_libraries(clang-highlight PRIVATE
     clang::Frontend
@@ -88,12 +98,10 @@ target_link_libraries(clang-highlight PRIVATE
     clang::ASTMatchers
     clang::Basic
     clang::Support
-    llvm::Core
-    llvm::Option
-    llvm::Support
-    llvm::ProfileData
-    llvm::FrontendOpenMP
-    llvm::WindowsDriver
+    llvm::libs
+    dl
+    rt
+    z
 )
 
 if(DEFINED SKBUILD_PROJECT_NAME)
