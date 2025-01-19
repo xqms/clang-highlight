@@ -29,4 +29,5 @@ FROM quay.io/pypa/manylinux_2_28_x86_64 AS final
 
 COPY --from=build /opt/llvm/include /opt/llvm/include
 COPY --from=build /opt/llvm/lib/*.a /opt/llvm/lib/
+COPY --from=build /opt/llvm/lib/clang /opt/llvm/lib/clang
 COPY --from=build /opt/llvm/bin/llvm-config /opt/llvm/bin/llvm-config
