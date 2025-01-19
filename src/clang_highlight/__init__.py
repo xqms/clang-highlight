@@ -80,9 +80,12 @@ def run(
             "--json-out",
             code_filename,
         ]
-        result = subprocess.run(
-            cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True
-        )
+        result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+        if result.returncode != 0:
+            raise RuntimeError(
+                f"clang-highlight failed. stderr:\n{result.stderr.decode('utf8')}"
+            )
 
         with open(code_filename, "rb") as f:
             code = f.read()
@@ -97,7 +100,10 @@ def run(
     tokens = [parse_token(d) for d in data["tokens"]]
 
     highlighted = HighlightedCode(
-        filename=filename, code=code, tokens=tokens, diagnostics=result.stderr
+        filename=filename,
+        code=code,
+        tokens=tokens,
+        diagnostics=result.stderr.decode("utf8"),
     )
 
     if cppref:
