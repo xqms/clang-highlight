@@ -33,6 +33,12 @@ endfunction()
 llvm_config(LLVM_VERSION --version)
 message(STATUS "Found LLVM version ${LLVM_VERSION}")
 
+string(REGEX MATCH "^([0-9]+)\\.([0-9]+)\\.([0-9]+)"
+       LLVM_VERSION_MATCH ${LLVM_VERSION})
+set(LLVM_VERSION_MAJOR ${CMAKE_MATCH_1})
+set(LLVM_VERSION_MINOR ${CMAKE_MATCH_2})
+set(LLVM_VERSION_PATCH ${CMAKE_MATCH_3})
+
 llvm_config(LLVM_INCLUDE_DIR --includedir)
 message(STATUS "LLVM include dir: ${LLVM_INCLUDE_DIR}")
 llvm_config(LLVM_LIBRARY_DIR --libdir)
@@ -112,6 +118,12 @@ if(DEFINED SKBUILD_PROJECT_NAME)
     install(FILES "${CMAKE_CURRENT_BINARY_DIR}/helper.txt" DESTINATION ${SKBUILD_PROJECT_NAME})
 
     install(TARGETS clang-highlight DESTINATION ${SKBUILD_PROJECT_NAME}/_util)
+
+    # Include clang's internal headers
+    install(
+        DIRECTORY "${LLVM_LIBRARY_DIR}/clang/${LLVM_VERSION_MAJOR}/include"
+        DESTINATION "${SKBUILD_PROJECT_NAME}/lib/clang/${LLVM_VERSION_MAJOR}"
+    )
 endif()
 
 # Tests
