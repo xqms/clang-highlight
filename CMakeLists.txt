@@ -43,6 +43,9 @@ llvm_config(LLVM_INCLUDE_DIR --includedir)
 message(STATUS "LLVM include dir: ${LLVM_INCLUDE_DIR}")
 llvm_config(LLVM_LIBRARY_DIR --libdir)
 message(STATUS "LLVM library dir: ${LLVM_LIBRARY_DIR}")
+llvm_config(LLVM_SYS_LIBS --link-static --system-libs)
+separate_arguments(LLVM_SYS_LIBS UNIX_COMMAND ${LLVM_SYS_LIBS})
+message(STATUS "LLVM system libs: ${LLVM_SYS_LIBS}")
 
 function(find_clang_lib name)
     find_library(clang_${name} clang${name} PATHS ${LLVM_LIBRARY_DIR})
@@ -61,6 +64,7 @@ target_include_directories(llvm_libs SYSTEM INTERFACE ${LLVM_INCLUDE_DIR})
 foreach(lib ${LLVM_LIBS_RAW})
     target_link_libraries(llvm_libs INTERFACE ${LLVM_LIBRARY_DIR}/${lib})
 endforeach()
+target_link_libraries(llvm_libs INTERFACE ${LLVM_SYS_LIBS})
 add_library(llvm::libs ALIAS llvm_libs)
 
 find_clang_lib(Analysis)
@@ -105,9 +109,6 @@ target_link_libraries(clang-highlight PRIVATE
     clang::Basic
     clang::Support
     llvm::libs
-    dl
-    rt
-    z
 )
 
 if(DEFINED SKBUILD_PROJECT_NAME)
