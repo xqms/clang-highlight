@@ -1,0 +1,16 @@
+name: Build
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container:
+      image: "xqms/clang-highlight-wheel"
+    steps:
+      - uses: actions/checkout@v4
+      - run: "uv build"
