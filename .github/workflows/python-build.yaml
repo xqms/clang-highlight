@@ -13,4 +13,7 @@ jobs:
       image: "xqms/clang-highlight-wheel"
     steps:
       - uses: actions/checkout@v4
-      - run: "uv build"
+      - name: "Build wheel"
+        env:
+          LLVM_DIR: /opt/llvm
+        run: "uv build"
