@@ -342,6 +342,7 @@ def handle_class(cls: ET.Element, reference_base: Path, out_base: Path):
         tpl_args, typedefs, tpl_parameter_set = generate_template_args(tpl_params)
         cls_type += tpl_args
 
+    typedef_str = "\n    ".join(typedefs)
     out = f"""
 
 #define static_assert(...)
@@ -380,7 +381,7 @@ struct MyPred {{
 }};
 
 {" ".join(["namespace " + ns + " {" for ns in namespaces])}
-{"\n    ".join(typedefs)}
+{typedef_str}
 using MyType = {cls_type};
 
 """
