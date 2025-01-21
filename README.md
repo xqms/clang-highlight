@@ -8,6 +8,9 @@ clang-highlight reads C/C++ code and outputs semantic tokens that can be used
 for syntax highlighting and interactive links. It is able to understand your
 code perfectly since it uses clang to lex the input and generate an AST.
 
+This tool is meant for static use cases (e.g. code documentation) rather than
+interactive use.
+
 Usage
 -----
 
@@ -17,32 +20,10 @@ told where your build directory with a compilation database
 
 Use
 
-    clang-highlight -p path/to/build --json-out=tokens.json path/to/code.cpp
-
-to generate a JSON file for further processing of tokens, or
-
-    clang-highlight -p path/to/build --html-out=out.html path/to/code.cpp
+    clang-highlight -p path/to/build path/to/code.cpp > out.html
 
 to directly generate highlighted & linked HTML using
 [m.css](https://github.com/mosra/m.css) styling.
-
-Example
--------
-
-```c++
-#include <iostream>
-
-void myFunction()
-{
-  std::cout << "Hello World!\n";
-}
-```
-
-gives the following JSON:
-
-```json
-
-```
 
 Why not ...
 -----------
