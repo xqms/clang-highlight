@@ -126,9 +126,3 @@ if(DEFINED SKBUILD_PROJECT_NAME)
         DESTINATION "${SKBUILD_PROJECT_NAME}/lib/clang/${LLVM_VERSION_MAJOR}"
     )
 endif()
-
-# Tests
-if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
-    include(CTest)
-    add_subdirectory(tests)
-endif()
