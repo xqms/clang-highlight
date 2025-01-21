@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Optional, List
+from typing import Optional, List, Iterable, Tuple
 from enum import Enum
 from pathlib import Path
 
@@ -55,7 +55,7 @@ class HighlightedCode:
     tokens: List[Token]
     diagnostics: str
 
-    def __iter__(self):
+    def __iter__(self) -> Iterable[Tuple[str, Optional[Token]]]:
         """
         Iterate over the tokenized code. Yields each text fragment and its
         corresponding token. Whitespace and ignored punctuation will result in
