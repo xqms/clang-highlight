@@ -50,11 +50,9 @@ def code_file_context(filename: Path = None, code: str = None):
     if filename:
         yield Path(filename)
     elif code:
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".cpp", delete_on_close=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".cpp") as f:
             f.write(code)
-            f.close()
+            f.flush()
             yield Path(f.name)
     else:
         raise RuntimeError("need either filename or code")
