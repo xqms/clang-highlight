@@ -17,3 +17,5 @@ jobs:
         env:
           LLVM_DIR: /opt/llvm
         run: "uv build"
+      - name: "Test"
+        run: "uvx --with dist/*.whl run python tests/tests.py"
