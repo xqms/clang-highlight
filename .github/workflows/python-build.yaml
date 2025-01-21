@@ -18,4 +18,4 @@ jobs:
           LLVM_DIR: /opt/llvm
         run: "uv build"
       - name: "Test"
-        run: "uvx --with dist/*.whl run python tests/tests.py"
+        run: "uv run --isolated --no-project --with dist/*.whl python tests/tests.py"
