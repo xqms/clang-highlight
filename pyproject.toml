@@ -27,9 +27,13 @@ classifiers = [
   # Specify the Python versions you support here.
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.8",
 ]
 
-requires-python = ">=3.12"
+requires-python = ">=3.8"
 dependencies = [
   "dacite>=1.8.1",
   "lxml>=5.3.0",
@@ -42,6 +46,7 @@ clang-highlight = "clang_highlight.main:main"
 [tool.scikit-build]
 minimum-version = "build-system.requires"
 build-dir = "build/{wheel_tag}"
+wheel.py-api = "py3"
 
 [dependency-groups]
 dev = [
