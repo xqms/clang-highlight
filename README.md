@@ -11,6 +11,12 @@ code perfectly since it uses clang to lex the input and generate an AST.
 This tool is meant for static use cases (e.g. code documentation) rather than
 interactive use.
 
+Installation
+------------
+
+PyPI packaging is work in progress. Stay tuned. You can install locally using
+`uv`/`uvx`.
+
 Usage
 -----
 
