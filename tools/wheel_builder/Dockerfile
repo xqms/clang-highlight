@@ -19,6 +19,7 @@ RUN cd /llvm-build && cmake -G Ninja \
     -DLLVM_ENABLE_PROJECTS="clang" \
     -DLLVM_PARALLEL_LINK_JOBS=4 \
     -DLLVM_TARGETS_TO_BUILD="X86" \
+    -DLLVM_ENABLE_ZLIB=OFF \
     -DCMAKE_INSTALL_PREFIX=/opt/llvm \
     /llvm-src/llvm
 
@@ -31,3 +32,9 @@ COPY --from=build /opt/llvm/include /opt/llvm/include
 COPY --from=build /opt/llvm/lib/*.a /opt/llvm/lib/
 COPY --from=build /opt/llvm/lib/clang /opt/llvm/lib/clang
 COPY --from=build /opt/llvm/bin/llvm-config /opt/llvm/bin/llvm-config
+
+# clang 19 does not find the rh toolset (it has hardcoded paths for version <= 12)
+RUN mkdir -p /root/.config/clang-highlight \
+    && echo "--gcc-toolchain=/opt/rh/gcc-toolset-14/root" > /root/.config/clang-highlight/clang.cfg \
+    && echo "--gcc-toolchain=/opt/rh/gcc-toolset-14/root" > /root/.config/clang-highlight/clang++.cfg
+
