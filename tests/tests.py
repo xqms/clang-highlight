@@ -27,7 +27,7 @@ class CHTests(unittest.TestCase):
         """
 
         h = clang_highlight.run(code=code)
-        self.assertEqual(len(h.diagnostics), 0)
+        self.assertEqual(len(h.diagnostics), 0, f"Diagnostics:\n{h.diagnostics}")
 
         _, tok_include = self.get_token(h, "#include")
         self.assertEqual(tok_include.type, TokenType.PREPROCESSOR)
@@ -53,7 +53,7 @@ class CHTests(unittest.TestCase):
         """
 
         h = clang_highlight.run(code=code)
-        self.assertEqual(len(h.diagnostics), 0)
+        self.assertEqual(len(h.diagnostics), 0, f"Diagnostics:\n{h.diagnostics}")
 
         _, tok_help = self.get_token(h, "emplace_back();")
         self.assertEqual(tok_help.type, TokenType.NAME)
@@ -102,7 +102,7 @@ class CHTests(unittest.TestCase):
         """
 
         h = clang_highlight.run(code=code)
-        self.assertEqual(len(h.diagnostics), 0)
+        self.assertEqual(len(h.diagnostics), 0, f"Diagnostics:\n{h.diagnostics}")
 
         _, tok_test = self.get_token(h, "test(0, true);")
         self.assertEqual(tok_test.link.qualified_name, "Test::test")
