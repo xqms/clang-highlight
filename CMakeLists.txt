@@ -2,9 +2,24 @@
 cmake_minimum_required(VERSION 3.20)
 project(clang_highlight)
 
-set(VERSION_MAJOR 0)
-set(VERSION_MINOR 1)
-set(VERSION_PATCH 0)
+# If we are run by scikit-build-core, use their project version. Otherwise,
+# use the last git tag.
+if(DEFINED SKBUILD_PROJECT_VERSION)
+    set(VERSION_STRING "${SKBUILD_PROJECT_VERSION}")
+else()
+    include(cmake/GitVersion.cmake)
+endif()
+
+if(VERSION_STRING MATCHES "[vV]?([0-9]+)\\.([0-9]+)\\.([0-9]+)")
+    set(VERSION_MAJOR ${CMAKE_MATCH_1})
+    set(VERSION_MINOR ${CMAKE_MATCH_2})
+    set(VERSION_PATCH ${CMAKE_MATCH_3})
+else()
+    set(VERSION_MAJOR 0)
+    set(VERSION_MINOR 0)
+    set(VERSION_PATCH 0)
+    message(WARNING "Failed to determine version from scikit-core-build or Git tags (\"${VERSION_STRING}\"). Using default version \"${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}\".")
+endif()
 
 set(CMAKE_CXX_STANDARD 23)
 

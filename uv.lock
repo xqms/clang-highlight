@@ -35,7 +35,7 @@ wheels = [
 
 [[package]]
 name = "clang-highlight"
-version = "0.1.0"
+version = "0.1.dev76+g835b209.d20250122"
 source = { editable = "." }
 dependencies = [
     { name = "dacite" },
