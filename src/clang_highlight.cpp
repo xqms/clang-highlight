@@ -192,8 +192,7 @@ static const NamedDecl *unspecialize(const NamedDecl *decl) {
         if (auto instFrom =
                 info->getTemplate()->getInstantiatedFromMemberTemplate()) {
           decl = instFrom->getTemplatedDecl();
-        }
-        else if (auto instFrom = info->getTemplate()) {
+        } else if (auto instFrom = info->getTemplate()) {
           decl = instFrom->getTemplatedDecl();
         }
       }
@@ -653,9 +652,16 @@ int main(int argc, const char **argv) {
   ClangTool Tool(OptionsParser.getCompilations(),
                  OptionsParser.getSourcePathList());
 
+  // We need information about preprocessor operation to highlight
+  // preprocessor directives and macro instantiations properly
   Tool.appendArgumentsAdjuster(
       getInsertArgumentAdjuster({"-Xclang", "-detailed-preprocessing-record"},
                                 ArgumentInsertPosition::END));
+
+  // Load additional clang flags from our config directory
+  Tool.appendArgumentsAdjuster(
+      getInsertArgumentAdjuster("--config-user-dir=~/.config/clang-highlight",
+                                ArgumentInsertPosition::BEGIN));
 
   std::vector<std::unique_ptr<ASTUnit>> ASTs;
   if (auto ret = Tool.buildASTs(ASTs))
