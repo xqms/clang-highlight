@@ -6,11 +6,21 @@ from typing import List, Optional
 from pathlib import Path
 from contextlib import contextmanager
 import importlib.resources
+from importlib.metadata import version, PackageNotFoundError
 
 from .data import Token, HighlightedCode, TokenType, Link
 from . import map_stl
 
-__all__ = ["Token", "TokenType", "Link", "HighlightedCode", "run"]
+
+__all__ = ["Token", "TokenType", "Link", "HighlightedCode", "run", "__version__"]
+
+
+try:
+    __version__ = version("clang_highlight")
+except PackageNotFoundError:
+    # package is not installed
+    pass
+
 
 # Find our C++ part
 _ch = None
