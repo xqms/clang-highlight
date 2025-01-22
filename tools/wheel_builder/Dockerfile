@@ -34,7 +34,7 @@ COPY --from=build /opt/llvm/lib/clang /opt/llvm/lib/clang
 COPY --from=build /opt/llvm/bin/llvm-config /opt/llvm/bin/llvm-config
 
 # clang 19 does not find the rh toolset (it has hardcoded paths for version <= 12)
-RUN mkdir -p /root/.config/clang-highlight \
-    && echo "--gcc-toolchain=/opt/rh/gcc-toolset-14/root" > /root/.config/clang-highlight/clang.cfg \
-    && echo "--gcc-toolchain=/opt/rh/gcc-toolset-14/root" > /root/.config/clang-highlight/clang++.cfg
+RUN mkdir -p /etc/clang-highlight \
+    && echo "--gcc-toolchain=/opt/rh/gcc-toolset-14/root" > /etc/clang-highlight/clang.cfg \
+    && echo "--gcc-toolchain=/opt/rh/gcc-toolset-14/root" > /etc/clang-highlight/clang++.cfg
 

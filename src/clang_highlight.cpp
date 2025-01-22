@@ -660,7 +660,8 @@ int main(int argc, const char **argv) {
 
   // Load additional clang flags from our config directory
   Tool.appendArgumentsAdjuster(
-      getInsertArgumentAdjuster("--config-user-dir=~/.config/clang-highlight",
+      getInsertArgumentAdjuster({"--config-user-dir=~/.config/clang-highlight",
+                                 "--config-system-dir=/etc/clang-highlight"},
                                 ArgumentInsertPosition::BEGIN));
 
   std::vector<std::unique_ptr<ASTUnit>> ASTs;
