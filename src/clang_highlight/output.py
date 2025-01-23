@@ -24,26 +24,8 @@ TOKEN_TYPE_TO_CSS_CLASS = {
 }
 
 
-def html(code: HighlightedCode, f: TextIO):
-    f.write("""<!doctype html>
-<html>
-    <head>
-        <meta charset="UTF-8" />
-        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Source+Sans+Pro:400,400i,600,600i%7CSource+Code+Pro:400,400i,600&amp;subset=latin-ext" />
-        <link rel="stylesheet" href="https://static.magnum.graphics/m-dark.compiled.css" />
-        <link rel="stylesheet" href="https://static.magnum.graphics/m-dark.documentation.compiled.css" />
-        <style>
-            .m-code a {
-                color: inherit;
-                text-decoration: none;
-            }
-            .m-code a:hover {
-                text-decoration: underline;
-            }
-        </style>
-    </head>
-    <body>
-        <pre class="m-code">""")
+def html_embed(code: HighlightedCode, f: TextIO):
+    f.write('<pre class="m-code">')
 
     for text, token in code:
         if token:
@@ -65,7 +47,33 @@ def html(code: HighlightedCode, f: TextIO):
                 f.write("</a>")
             f.write("</span>")
 
-    f.write("</pre></body></html>\n")
+    f.write("</pre>")
+
+
+def html(code: HighlightedCode, f: TextIO):
+    f.write("""<!doctype html>
+<html>
+    <head>
+        <meta charset="UTF-8" />
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Source+Sans+Pro:400,400i,600,600i%7CSource+Code+Pro:400,400i,600&amp;subset=latin-ext" />
+        <link rel="stylesheet" href="https://static.magnum.graphics/m-dark.compiled.css" />
+        <link rel="stylesheet" href="https://static.magnum.graphics/m-dark.documentation.compiled.css" />
+        <style>
+            .m-code a {
+                color: inherit;
+                text-decoration: none;
+            }
+            .m-code a:hover {
+                text-decoration: underline;
+            }
+        </style>
+    </head>
+    <body>
+        <pre class="m-code">""")
+
+    html_embed(code, f)
+
+    f.write("</body></html>\n")
 
 
 def json(code: HighlightedCode, f: TextIO):
@@ -89,5 +97,6 @@ def json(code: HighlightedCode, f: TextIO):
 
 FORMATTERS = {
     "html": html,
+    "html_embed": html_embed,
     "json": json,
 }
