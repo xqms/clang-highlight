@@ -560,12 +560,12 @@ def work(workdir: Path):
     archive_path = workdir / "cppreference.tar.xz"
 
     if not archive_path.exists():
-        print("Downloading cppreference archive")
+        print("Downloading cppreference archive", file=sys.stderr)
         subprocess.run(["wget", DOWNLOAD_URL, f"-O{archive_path}"], check=True)
 
     extracted_path = workdir / "cppreference"
     if not (extracted_path / "Makefile").exists():
-        print("Extracting...")
+        print("Extracting...", file=sys.stderr)
         extracted_path.mkdir(exist_ok=True)
 
         subprocess.run(
@@ -590,26 +590,26 @@ def work(workdir: Path):
     out_base = workdir / "stl_calls"
     out_base.mkdir(exist_ok=True)
 
-    print("\nGenerating STL calls...\n")
+    print("\nGenerating STL calls...\n", file=sys.stderr)
     files = []
     for cls in tree.findall("class"):
         f = handle_class(cls, reference_base, out_base)
         if f:
             files.append(f)
 
-    print("\nResolving STL calls...")
+    print("\nResolving STL calls...", file=sys.stderr)
     pool = ThreadPool()
     result = list(tqdm(pool.imap(lambda x: process_file(x), files), total=len(files)))
 
     result = list(zip(files, result))
     result = sorted(result, key=lambda x: x[1][1])
 
-    print("STL mapping failures per file:")
+    print("STL mapping failures per file:", file=sys.stderr)
     for f, res in result:
         if res[1] != 0:
-            print(f, res[1])
+            print(f, res[1], file=sys.stderr)
 
-    print(f"Failures in total: {sum([res[1][1] for res in result])}")
+    print(f"Failures in total: {sum([res[1][1] for res in result])}", file=sys.stderr)
 
     functions = {}
     for f, res in result:
