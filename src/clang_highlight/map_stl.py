@@ -527,11 +527,14 @@ def get_symbols(index: ET.ElementTree):
     # Classes
     for cls in index.findall("class"):
         cls_name = cls.attrib["name"]
+        cls_name_local = cls_name.rpartition("::")[2]
         cls_link = cls.attrib["link"]
         symbols[cls_name] = cls_link
 
-        def link(t):
-            tl = t.attrib.get("link", ".")
+        def link(t, tn=None):
+            if not tn:
+                tn = t.attrib["name"]
+            tl = t.attrib.get("link", f"{cls_link}/{tn}")
             if tl == ".":
                 return cls_link
             else:
@@ -544,11 +547,11 @@ def get_symbols(index: ET.ElementTree):
 
         cons = cls.find("constructor")
         if cons is not None:
-            symbols[f"{cls_name}::{cls_name.rpartition('::')[2]}"] = link(cons)
+            symbols[f"{cls_name}::{cls_name_local}"] = link(cons, cls_name_local)
 
         des = cls.find("destructor")
         if des is not None:
-            symbols[f"{cls_name}::~{cls_name.rpartition('::')[2]}"] = link(des)
+            symbols[f"{cls_name}::~{cls_name_local}"] = link(des, cls_name_local)
 
     for name, to in alias_symbols.items():
         symbols[name] = symbols[to]
