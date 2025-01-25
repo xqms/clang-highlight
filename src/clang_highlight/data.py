@@ -20,12 +20,15 @@ class TokenType(Enum):
     KEYWORD = "keyword"
     NAME = "name"
     STRING_LITERAL = "string_literal"
+    STRING_LITERAL_ESCAPE = "string_literal_escape"
+    STRING_LITERAL_INTERPOLATION = "string_literal_interpolation"
     NUMBER_LITERAL = "number_literal"
     OTHER_LITERAL = "other_literal"
     OPERATOR = "operator"
     PUNCTUATION = "punctuation"
     COMMENT = "comment"
     PREPROCESSOR = "preprocessor"
+    PREPROCESSOR_FILE = "preprocessor_file"
     VARIABLE = "variable"
     OTHER = "other"
 
@@ -41,7 +44,7 @@ class Token:
 
     type: TokenType
 
-    link: Optional[Link]
+    link: Optional[Link] = None
 
 
 @dataclass

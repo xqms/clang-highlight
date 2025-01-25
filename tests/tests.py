@@ -1,10 +1,16 @@
 import unittest
 import clang_highlight
 from typing import Tuple, Optional
-from clang_highlight import TokenType, Token
+from clang_highlight import TokenType, Token, HighlightedCode
 
 
 class CHTests(unittest.TestCase):
+    def run_ch(self, code: str) -> HighlightedCode:
+        h = clang_highlight.run(code=code)
+        self.assertEqual(len(h.diagnostics), 0, f"Diagnostics:\n{h.diagnostics}")
+
+        return h
+
     def get_token(
         self, highlighted: clang_highlight.HighlightedCode, fragment: str
     ) -> Tuple[str, Optional[Token]]:
@@ -26,8 +32,7 @@ class CHTests(unittest.TestCase):
         }
         """
 
-        h = clang_highlight.run(code=code)
-        self.assertEqual(len(h.diagnostics), 0, f"Diagnostics:\n{h.diagnostics}")
+        h = self.run_ch(code)
 
         _, tok_include = self.get_token(h, "#include")
         self.assertEqual(tok_include.type, TokenType.PREPROCESSOR)
@@ -52,8 +57,7 @@ class CHTests(unittest.TestCase):
         }
         """
 
-        h = clang_highlight.run(code=code)
-        self.assertEqual(len(h.diagnostics), 0, f"Diagnostics:\n{h.diagnostics}")
+        h = self.run_ch(code)
 
         _, tok_help = self.get_token(h, "emplace_back();")
         self.assertEqual(tok_help.type, TokenType.NAME)
@@ -101,8 +105,7 @@ class CHTests(unittest.TestCase):
         }
         """
 
-        h = clang_highlight.run(code=code)
-        self.assertEqual(len(h.diagnostics), 0, f"Diagnostics:\n{h.diagnostics}")
+        h = self.run_ch(code)
 
         _, tok_test = self.get_token(h, "test(0, true);")
         self.assertEqual(tok_test.link.qualified_name, "Test::test")
@@ -127,6 +130,46 @@ class CHTests(unittest.TestCase):
         _, tok_call = self.get_token(h, "func(0);")
         self.assertEqual(tok_call.link.qualified_name, "func")
         self.assertEqual(tok_call.link.parameter_types, ["T"])
+
+    def test_preprocessor(self):
+        code = """
+        #include <iostream>
+        # include <cmath>
+        #include"cstdlib"
+        """
+
+        h = self.run_ch(code)
+
+        _, tok = self.get_token(h, "#include <iostream>")
+        self.assertEqual(tok.type, TokenType.PREPROCESSOR)
+
+        _, tok = self.get_token(h, "<iostream>")
+        self.assertEqual(tok.type, TokenType.PREPROCESSOR_FILE)
+
+    def test_strings(self):
+        code = r"""
+        const char* str1 = "newline: \n";
+        const char* str2 = "\U0001F600";
+        const char* str3 = "{} {a}";
+        """
+
+        h = self.run_ch(code)
+
+        text, tok = self.get_token(h, r"\n")
+        self.assertEqual(tok.type, TokenType.STRING_LITERAL_ESCAPE)
+        self.assertEqual(text, r"\n")
+
+        text, tok = self.get_token(h, r"\U0001F600")
+        self.assertEqual(tok.type, TokenType.STRING_LITERAL_ESCAPE)
+        self.assertEqual(text, r"\U0001F600")
+
+        text, tok = self.get_token(h, r"{}")
+        self.assertEqual(tok.type, TokenType.STRING_LITERAL_INTERPOLATION)
+        self.assertEqual(text, r"{}")
+
+        text, tok = self.get_token(h, r"{a}")
+        self.assertEqual(tok.type, TokenType.STRING_LITERAL_INTERPOLATION)
+        self.assertEqual(text, r"{a}")
 
 
 if __name__ == "__main__":

@@ -9,7 +9,7 @@ import importlib.resources
 from importlib.metadata import version, PackageNotFoundError
 
 from .data import Token, HighlightedCode, TokenType, Link
-from . import map_stl
+from . import map_stl, postprocessing
 
 
 __all__ = ["Token", "TokenType", "Link", "HighlightedCode", "run", "__version__"]
@@ -113,6 +113,9 @@ def run(
         tokens=tokens,
         diagnostics=result.stderr.decode("utf8"),
     )
+
+    for p in postprocessing.ALL:
+        p(highlighted)
 
     if cppref:
         map_stl.resolve_stl(highlighted)

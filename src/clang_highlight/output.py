@@ -14,12 +14,15 @@ TOKEN_TYPE_TO_CSS_CLASS = {
     TokenType.KEYWORD: "k",
     TokenType.NAME: "n",
     TokenType.STRING_LITERAL: "s",
+    TokenType.STRING_LITERAL_ESCAPE: "se",
+    TokenType.STRING_LITERAL_INTERPOLATION: "si",
     TokenType.NUMBER_LITERAL: "m",
     TokenType.OTHER_LITERAL: "l",
     TokenType.OPERATOR: "o",
     TokenType.PUNCTUATION: "p",
     TokenType.COMMENT: "c",
     TokenType.PREPROCESSOR: "cp",
+    TokenType.PREPROCESSOR_FILE: "cpf",
     TokenType.VARIABLE: "nv",
 }
 
