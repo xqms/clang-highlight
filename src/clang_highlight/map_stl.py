@@ -15,6 +15,9 @@ import dataclasses
 from multiprocessing.pool import ThreadPool
 from urllib.parse import quote
 
+import requests
+import shutil
+import functools
 from tqdm import tqdm
 
 from .data import TokenType, HighlightedCode, Link
@@ -564,7 +567,23 @@ def work(workdir: Path):
 
     if not archive_path.exists():
         print("Downloading cppreference archive", file=sys.stderr)
-        subprocess.run(["wget", DOWNLOAD_URL, f"-O{archive_path}"], check=True)
+
+        response = requests.get(DOWNLOAD_URL, stream=True, allow_redirects=True)
+
+        if response.status_code != 200:
+            response.raise_for_status()
+            raise RuntimeError(
+                f"Got HTTP {response.status_code} while trying to download {DOWNLOAD_URL}"
+            )
+
+        total_size = int(response.headers.get("content-length", 0))
+
+        desc = "(Unknown total file size)" if total_size == 0 else ""
+
+        response.raw.read = functools.partial(response.raw.read, decode_content=True)
+        with tqdm.wrapattr(response.raw, "read", total=total_size, desc=desc) as r_raw:
+            with archive_path.open("wb") as f:
+                shutil.copyfileobj(r_raw, f)
 
     extracted_path = workdir / "cppreference"
     if not (extracted_path / "Makefile").exists():
