@@ -19,3 +19,23 @@ jobs:
         run: "uv build"
       - name: "Test"
         run: "uv run --python 3.10 --isolated --no-project --with dist/*.whl python tests/tests.py"
+      - name: "Build documentation"
+        if: ${{ github.ref == 'refs/heads/master' }}
+        run: "uv run --python 3.10 --isolated --only-group dev --with dist/*.whl doc/build.sh"
+      - name: Upload doc as artifact
+        id: upload_doc
+        if: ${{ github.ref == 'refs/heads/master' }}
+        uses: actions/upload-pages-artifact@v3 # or specific "vX.X.X" version tag for this action
+        with:
+          path: doc/output/
+
+  # Deploy to GitHub pages
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.upload_doc.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy to GitHub Pages
+        uses: actions/deploy-pages@v4
