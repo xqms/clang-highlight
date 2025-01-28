@@ -18,7 +18,7 @@ Here is an example output:
 
 Tip: Nearly all tokens are linked to documentation or sources.
 
-Compare that with `Pygments https://pygments.org/`_' output:
+Compare that with `Pygments <https://pygments.org/>`_' output:
 
 .. include:: example.cpp
     :code: c++
