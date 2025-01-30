@@ -616,8 +616,17 @@ int main(int argc, const char **argv) {
           tokenIt = tokens.erase(tokenIt);
         }
 
-        tokens[beginOffset] =
-            ResultToken{lexerToken, ResultToken::Type::Preprocessor};
+        auto token = ResultToken{lexerToken, ResultToken::Type::Preprocessor};
+
+        auto include = static_cast<clang::InclusionDirective *>(preproc);
+        if (auto file = include->getFile()) {
+          token.link = Link{.name = "<file>",
+                            .qualifiedName = "<file>",
+                            .file = file->getName(),
+                            .column = 0};
+        }
+
+        tokens[beginOffset] = token;
         break;
       }
       case PreprocessedEntity::EntityKind::MacroExpansionKind:
