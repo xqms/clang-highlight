@@ -85,7 +85,6 @@ def run(
             "-p",
             ch_build_dir,
             f"--punctuation={punctuation}",
-            "--json-out",
             code_filename,
         ]
         result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
