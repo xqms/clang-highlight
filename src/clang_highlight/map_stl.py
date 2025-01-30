@@ -562,6 +562,34 @@ def get_symbols(index: ET.ElementTree):
     return symbols
 
 
+def get_headers(reference_base: Path):
+    # I'd love to use index-chapters-cpp.xml, but it's not complete.
+    tree = lxml.html.fromstring(open(reference_base / "cpp" / "headers.html").read())
+
+    xml_headers = tree.findall(".//div[@class='t-dsc-member-div']//a")
+    headers = {}
+    link_re = re.compile(r"header/(?P<name>.*)\.html")
+    for a in xml_headers:
+        m = link_re.match(a.attrib["href"])
+        assert m is not None, f"Could not match {a.attrib['href']}"
+        headers[f"<{m['name']}>"] = f"cpp/header/{m['name']}"
+
+    code = "\n".join([f"#include {n}" for n in headers.keys()])
+
+    h = clang_highlight.run(code=code)
+
+    include_to_link = {}
+
+    for text, token in h:
+        if not token or token.type != TokenType.PREPROCESSOR_FILE:
+            continue
+
+        if token.link:
+            include_to_link[str(token.link.file)] = headers[text]
+
+    return include_to_link
+
+
 def work(workdir: Path):
     archive_path = workdir / "cppreference.tar.xz"
 
@@ -603,11 +631,13 @@ def work(workdir: Path):
             check=True,
         )
 
-    tree = ET.parse(extracted_path / "index-functions-cpp.xml")
-
-    symbols = get_symbols(tree)
-
     reference_base = extracted_path / "reference" / "en.cppreference.com" / "w"
+
+    print("\nMapping headers...\n", file=sys.stderr)
+    headers = get_headers(reference_base)
+
+    tree = ET.parse(extracted_path / "index-functions-cpp.xml")
+    symbols = get_symbols(tree)
 
     out_base = workdir / "stl_calls"
     out_base.mkdir(exist_ok=True)
@@ -647,7 +677,7 @@ def work(workdir: Path):
 
     with open(CACHE_FILE, "w") as f:
         json.dump(
-            {"symbols": symbols, "overloads": functions},
+            {"symbols": symbols, "overloads": functions, "headers": headers},
             f,
             indent=2,
             default=serialize_path,
@@ -691,10 +721,17 @@ def resolve_stl(highlighted: HighlightedCode):
                 if matching:
                     page = matching[0]["page"]
 
+        # Is this a header?
+        if link.name == "<file>":
+            page = stl_map["headers"].get(str(link.file))
+
         if page is not None:
             link.cppref = page
 
 
 if __name__ == "__main__":
-    with tempfile.TemporaryDirectory(prefix="stl_map") as workdir:
-        work(Path(workdir))
+    import sys
+
+    workdir = Path(sys.argv[1])
+    workdir.mkdir(exist_ok=True)
+    work(workdir)
