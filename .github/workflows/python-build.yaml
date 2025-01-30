@@ -31,6 +31,7 @@ jobs:
 
   # Deploy to GitHub pages
   deploy:
+    if: ${{ github.ref == 'refs/heads/master' }}
     needs: build
     environment:
       name: github-pages
