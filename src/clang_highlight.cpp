@@ -20,7 +20,6 @@
 #include <llvm/Support/raw_os_ostream.h>
 #pragma GCC diagnostic pop
 
-#include <fstream>
 #include <iostream>
 
 using namespace clang;
@@ -84,35 +83,6 @@ struct ResultToken {
       return "other";
     }
     return "unknown";
-  }
-  static const char *typeCSS(Type type) {
-    switch (type) {
-    case Type::Whitespace:
-      return nullptr;
-    case Type::Keyword:
-      return "k";
-    case Type::Name:
-      return "n";
-    case Type::StringLiteral:
-      return "s";
-    case Type::NumberLiteral:
-      return "m";
-    case Type::OtherLiteral:
-      return "l";
-    case Type::Operator:
-      return "o";
-    case Type::Punctuation:
-      return "p";
-    case Type::Comment:
-      return "c";
-    case Type::Preprocessor:
-      return "cp";
-    case Type::Variable:
-      return "nv";
-    case Type::Other:
-      return nullptr;
-    }
-    return nullptr;
   }
 
   void determineType(const clang::Preprocessor &pp) {
@@ -463,90 +433,6 @@ private:
   TokenMap &tokens;
 };
 
-void dumpHTML(std::istream &in, std::ostream &out, const TokenMap &tokens) {
-  out << R"EOS(<!doctype html>
-            <html>
-                <head>
-                    <meta charset="UTF-8" />
-                    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Source+Sans+Pro:400,400i,600,600i%7CSource+Code+Pro:400,400i,600&amp;subset=latin-ext" />
-                    <link rel="stylesheet" href="https://static.magnum.graphics/m-dark.compiled.css" />
-                    <link rel="stylesheet" href="https://static.magnum.graphics/m-dark.documentation.compiled.css" />
-                    <style>
-                        .m-code a {
-                            color: inherit;
-                            text-decoration: none;
-                        }
-                        .m-code a:hover {
-                            text-decoration: underline;
-                        }
-                    </style>
-                </head>
-                <body>
-                    <pre class="m-code">
-)EOS";
-
-  std::size_t textOffset = 0;
-  std::vector<char> copyBuf;
-
-  auto transfer = [&](std::size_t n) {
-    copyBuf.resize(n);
-
-    in.read(copyBuf.data(), n);
-
-    for (char c : copyBuf) {
-      switch (c) {
-      case '&':
-        out << "&amp;";
-        break;
-      case '<':
-        out << "&lt;";
-        break;
-      case '>':
-        out << "&gt;";
-        break;
-      case '"':
-        out << "&quot;";
-        break;
-      case '\'':
-        out << "&#39;";
-        break;
-      case '/':
-        out << "&#47;";
-        break;
-      default:
-        out << c;
-        break;
-      }
-    }
-
-    textOffset += n;
-  };
-
-  for (auto &[offset, token] : tokens) {
-    if (offset > textOffset)
-      transfer(offset - textOffset);
-
-    const char *css = ResultToken::typeCSS(token.type);
-
-    if (css)
-      out << "<span class=\"" << css << "\">";
-
-    if (token.link)
-      out << "<a href=\"file://" << token.link->file.data() << "#"
-          << token.link->line << "_" << token.link->name << "\">";
-
-    transfer(token.token.getLength());
-
-    if (token.link)
-      out << "</a>";
-
-    if (css)
-      out << "</span>";
-  }
-
-  out << "</pre></body></html>\n";
-}
-
 enum class PunctuationMode { Keep, KeepLinked, Skip };
 
 void dumpJSON(std::ostream &out, const std::string &file,
@@ -607,19 +493,6 @@ static llvm::cl::OptionCategory MyCategory("clang_highlight options");
 // command-line options related to the compilation database and input files.
 // It's nice to have this help message in all tools.
 static cl::extrahelp CommonHelp(CommonOptionsParser::HelpMessage);
-
-static cl::list<std::string> OptHTMLOut{"html-out",
-                                        cl::desc{"Write HTML output to"},
-                                        cl::value_desc{"out.html"},
-                                        cl::cat{MyCategory},
-                                        cl::Optional,
-                                        cl::ValueOptional};
-static cl::list<std::string> OptJSONOut{"json-out",
-                                        cl::desc{"Write JSON output to"},
-                                        cl::value_desc{"out.json"},
-                                        cl::cat{MyCategory},
-                                        cl::Optional,
-                                        cl::ValueOptional};
 
 static cl::opt<PunctuationMode> OptPunctMode{
     "punctuation", cl::desc{"Choose which punctuation tokens to keep"},
@@ -786,30 +659,9 @@ int main(int argc, const char **argv) {
   Finder.addMatcher(MemberExprMatcher, &memberHandler);
   Finder.matchAST(ast->getASTContext());
 
-  // Dump HTML
-  if (!OptHTMLOut.empty()) {
-    std::ifstream in{ast->getMainFileName().data()};
-
-    if (OptHTMLOut.front().empty())
-      dumpHTML(in, std::cout, tokens);
-    else {
-      std::ofstream out{OptHTMLOut.front()};
-      dumpHTML(in, out, tokens);
-    }
-  }
-
   // Dump JSON
-  if (!OptJSONOut.empty()) {
-    std::ofstream out{OptJSONOut.front()};
-    auto file = ast->getMainFileName().str();
-
-    if (OptJSONOut.front().empty())
-      dumpJSON(std::cout, file, tokens, OptPunctMode);
-    else {
-      std::ofstream out{OptJSONOut.front()};
-      dumpJSON(out, file, tokens, OptPunctMode);
-    }
-  }
+  auto file = ast->getMainFileName().str();
+  dumpJSON(std::cout, file, tokens, OptPunctMode);
 
   return 0;
 }
