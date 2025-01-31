@@ -41,7 +41,10 @@ def html_embed(code: HighlightedCode, f: TextIO):
                         f'<a href="https://en.cppreference.com/w/{token.link.cppref}">'
                     )
                 else:
-                    f.write(f'<a href="{token.link.file}#L{token.link.line}">')
+                    if token.link.line != 0:
+                        f.write(f'<a href="{token.link.file}#L{token.link.line}">')
+                    else:
+                        f.write(f'<a href="{token.link.file}">')
 
         f.write(html_escape(text))
 

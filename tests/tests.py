@@ -6,7 +6,7 @@ from clang_highlight import TokenType, Token, HighlightedCode
 
 class CHTests(unittest.TestCase):
     def run_ch(self, code: str) -> HighlightedCode:
-        h = clang_highlight.run(code=code)
+        h = clang_highlight.run(code=code, cppref=True)
         self.assertEqual(len(h.diagnostics), 0, f"Diagnostics:\n{h.diagnostics}")
 
         return h
@@ -170,6 +170,25 @@ class CHTests(unittest.TestCase):
         text, tok = self.get_token(h, r"{a}")
         self.assertEqual(tok.type, TokenType.STRING_LITERAL_INTERPOLATION)
         self.assertEqual(text, r"{a}")
+
+    def test_include(self):
+        code = r"""
+        #include <iostream>
+        """
+
+        h = self.run_ch(code)
+
+        text, tok = self.get_token(h, r"#include")
+        self.assertEqual(tok.type, TokenType.PREPROCESSOR)
+        self.assertTrue(tok.link is None)
+
+        text, tok = self.get_token(h, r"<iostream>")
+        self.assertEqual(tok.type, TokenType.PREPROCESSOR_FILE)
+        self.assertTrue(tok.link is not None)
+        self.assertEqual(tok.link.name, "<file>")
+        self.assertEqual(tok.link.file.name, "iostream")
+        self.assertTrue(tok.link.file.is_absolute())
+        self.assertEqual(tok.link.cppref, "cpp/header/iostream")
 
 
 if __name__ == "__main__":
